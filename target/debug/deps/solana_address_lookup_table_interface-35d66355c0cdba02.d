@@ -1,0 +1,8 @@
+/Users/mac/fuego/target/debug/deps/solana_address_lookup_table_interface-35d66355c0cdba02.d: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/error.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/instruction.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/state.rs
+
+/Users/mac/fuego/target/debug/deps/libsolana_address_lookup_table_interface-35d66355c0cdba02.rmeta: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/error.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/instruction.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/state.rs
+
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/lib.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/error.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/instruction.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/solana-address-lookup-table-interface-2.2.2/src/state.rs:

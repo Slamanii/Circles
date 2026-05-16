@@ -32,6 +32,7 @@ yarn-error.*
 
 # local env files
 .env*.local
+.treasury-keypair.json
 
 # typescript
 *.tsbuildinfo

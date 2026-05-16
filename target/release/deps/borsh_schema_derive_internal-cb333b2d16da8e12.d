@@ -1,0 +1,10 @@
+/Users/mac/fuego/target/release/deps/borsh_schema_derive_internal-cb333b2d16da8e12.d: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/helpers.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/enum_schema.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/struct_schema.rs
+
+/Users/mac/fuego/target/release/deps/libborsh_schema_derive_internal-cb333b2d16da8e12.rlib: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/helpers.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/enum_schema.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/struct_schema.rs
+
+/Users/mac/fuego/target/release/deps/libborsh_schema_derive_internal-cb333b2d16da8e12.rmeta: /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/lib.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/helpers.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/enum_schema.rs /Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/struct_schema.rs
+
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/lib.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/helpers.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/enum_schema.rs:
+/Users/mac/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/borsh-schema-derive-internal-0.10.4/src/struct_schema.rs:
