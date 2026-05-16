@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "programs/ticket_program"
+]
+resolver = "2"
+
+[profile.release]
+overflow-checks = true
