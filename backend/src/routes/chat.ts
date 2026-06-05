@@ -214,7 +214,7 @@ export async function getUnreadCountRouter(req: AuthRequest, res: Response) {
     }
 }
 
-export async function markAsReadRouter({req, res}: any) {
+export async function markAsReadRouter(req: any, res: any) {
 
     try {     
      

@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/ticket_program.json`.
  */
 export type TicketProgram = {
-  "address": "8Ed9Jimrz4istGe3C9QViAUsvBxTUof7MiFyJsAmpVy1",
+  "address": "UTitk8h1unBx2KrKdUiJ4iwsPYVESyCWbsooTQfivJV",
   "metadata": {
     "name": "ticketProgram",
     "version": "0.1.0",

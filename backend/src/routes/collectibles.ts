@@ -1,40 +1,43 @@
 import { initiatePaystackPay, paystackWebhook } from "../services/paystack";
-import { initiateWalletTransaction } from "../services/walletPay";
+import { getPaymentOptions, confirmWalletPurchase } from "../services/walletPay";
 import { fetchUserCollectibles, getCollectibleProof, transferTicketP2P } from "../mod/collectibles";
 import { AuthRequest } from "../mod/auth"
 import { Response } from "express"
 
 
-export async function initiateWalletTransactionRouter(req: AuthRequest, res: Response) {
-    const userId = req.user!.id;
-    const { eventId } = req.body;
+export async function getPaymentOptionsRouter(req: AuthRequest, res: Response) {
+    try {
+        const { eventId, quantity } = req.body;
+        const result = await getPaymentOptions(eventId, Number(quantity));
+        res.json(result);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        res.status(500).json({ error: msg });
+    }
+}
 
-    const result = await initiateWalletTransaction({
-        userId,
-        eventId,
-    });
-
-    res.json(result);
+export async function confirmWalletPurchaseRouter(req: AuthRequest, res: Response) {
+    try {
+        const userId = req.user!.id;
+        const { eventId, txSignature, tokenMint, quantity } = req.body;
+        const result = await confirmWalletPurchase({ userId, eventId, txSignature, tokenMint, quantity: Number(quantity) });
+        res.json(result);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        res.status(500).json({ error: msg });
+    }
 }
 
 export async function initiatePaystackPayRouter(req: AuthRequest, res: Response) {
-
-   const { userId, eventId } = req.body
-
-   try {
-
-      const result = await initiatePaystackPay({
-         userId,
-         eventId
-      })
-
-      res.json(result)
-
-   } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      res.status(500).json({ error: errorMessage })
-   }
-
+    try {
+        const userId = req.user!.id;
+        const { eventId, quantity } = req.body;
+        const result = await initiatePaystackPay({ userId, eventId, quantity });
+        res.json(result);
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        res.status(500).json({ error: errorMessage });
+    }
 }
 
 export async function initiatepaystackWebhookRouter(req: AuthRequest, res: Response) {
@@ -56,15 +59,9 @@ export async function initiatepaystackWebhookRouter(req: AuthRequest, res: Respo
 }
 
 export async function paystackReturn(req: AuthRequest, res: Response) {
-
-  const { reference } = req.query
-
-  if (!reference) {
-    return res.status(400).send("Mssing reference")
-  }
-
-   res.redirect("https://yourapp.com/payment-success")
-
+    const { reference } = req.query;
+    if (!reference) return res.status(400).send("Missing reference");
+    res.redirect(`fuego://payment?reference=${reference}&status=success`);
 }
 
 export async function fetchCollectiblesRouter(req: AuthRequest, res: Response) {

@@ -19,20 +19,24 @@ export function useEvents() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        async function load() {
-            try {
-                const data = await fetchEvents();
-                setEvents(data);
-            } catch (err) {
-                setError("Failed to load events");
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
+    async function load() {
+        try {
+            const data = await fetchEvents();
+            setEvents(data);
+        } catch (err) {
+            setError("Failed to load events");
+            console.error(err);
+        } finally {
+            setLoading(false);
         }
-        load();
-    }, []);
+    }
 
-    return { events, loading, error };
+    useEffect(() => { load(); }, []);
+
+    const reload = async () => {
+        setError(null);
+        await load();
+    };
+
+    return { events, loading, error, reload };
 }

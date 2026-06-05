@@ -3,9 +3,13 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, View } from "react-native";
 
 import { createNavigationContainerRef, NavigationContainer } from "@react-navigation/native";
+import { MobileWalletProvider } from "@wallet-ui/react-native-web3js";
 import LoginScreen from "./components/login";
+import { ThemeProvider } from "./context/ThemeContext";
 import Navigation from "./navigation";
 import NotificationListener from "./screens/notificationProvider";
+
+const WALLET_IDENTITY = { name: "Fuego", uri: "https://fuego.app", icon: "favicon.ico" };
 
 
 export type RootStackParamList = {
@@ -26,23 +30,18 @@ export default function App() {
   useEffect(() => {
     const restoreSession = async () => {
       try {
-
-        const token = await AsyncStorage.getItem("token");
+const token = await AsyncStorage.getItem("token");
         const user = await AsyncStorage.getItem("user");
-
         if (token && user) {
           const parsedUser = JSON.parse(user);
           setAuthenticated(true);
           setUserId(parsedUser.id);
         }
-
       } catch (err) {
         console.error("Session restore failed:", err);
       }
-
       setReady(true);
     };
-
     restoreSession();
   }, []);
 
@@ -68,12 +67,18 @@ export default function App() {
   }
 
   return (
-    <>
-      <NavigationContainer ref={navigationRef}>
-        <Navigation />
-      </NavigationContainer>
+    <MobileWalletProvider
+      chain="mainnet-beta"
+      endpoint={process.env.EXPO_PUBLIC_HELIUS_RPC_URL!}
+      identity={WALLET_IDENTITY}
+    >
+      <ThemeProvider>
+        <NavigationContainer ref={navigationRef}>
+          <Navigation />
+        </NavigationContainer>
 
-      {userId && <NotificationListener userId={userId} />}
-    </>
+        {userId && <NotificationListener userId={userId} />}
+      </ThemeProvider>
+    </MobileWalletProvider>
   );
 }

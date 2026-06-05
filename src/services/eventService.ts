@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { uploadMedia } from "./upload";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -15,6 +16,10 @@ export async function fetchEvents(limit: number = 50, offset: number = 0) {
     const res = await fetch(`${API_URL}/api/fetch-events?limit=${limit}&offset=${offset}`, { headers });
     if (!res.ok) throw new Error("Failed to fetch events");
     return await res.json();
+}
+
+export async function uploadFlyer(uri: string): Promise<string> {
+    return uploadMedia(uri, "event-flyers", "flyer.jpg", "image/jpeg");
 }
 
 export async function createEvent(eventData: any) {

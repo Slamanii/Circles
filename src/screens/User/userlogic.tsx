@@ -1,124 +1,113 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 import { Share } from "react-native";
-import { fetchFollowers, fetchFollowing, fetchHostedEvents, followUser, getUser } from "../../services/user";
+import { useAppTheme } from "../../context/ThemeContext";
+import {
+    fetchHostedEvents,
+    fetchLikedEvents,
+    followUser,
+    getUserProfile,
+} from "../../services/user";
+
+const PAGE_SIZE = 5;
 
 export function useUserLogic(followingId?: string) {
-
     const navigation = useNavigation<any>();
 
+    const [refreshing, setRefreshing] = useState(false);
     const [followed, setFollowed] = useState(false);
     const [isOwnProfile, setIsOwnProfile] = useState(false);
-    const [username, setUsername] = useState<string>("");
-    const [followers, setFollowers] = useState<number>(0);
-    const [following, setFollowing] = useState<number>(0);
-    const [likes, setLikes] = useState<number>(0);
-    const [showSettings, setShowSettings] = useState(false);
-    const [theme, setTheme] = useState<"light" | "dark">("light");
+    const [username, setUsername] = useState("");
+    const [displayName, setDisplayName] = useState("");
+    const [avatar, setAvatar] = useState<string | null>(null);
+    const [bio, setBio] = useState<string | null>(null);
+    const [link1, setLink1] = useState<string | null>(null);
+    const [link2, setLink2] = useState<string | null>(null);
+    const [followers, setFollowers] = useState(0);
+    const [following, setFollowing] = useState(0);
+    const [isPrivate, setIsPrivate] = useState(false);
+    const [canViewContent, setCanViewContent] = useState(true);
 
-    useEffect(() => {
-        loadUserData();
-    }, [])
+    const [hostedEvents, setHostedEvents] = useState<any[]>([]);
+    const [likedEvents, setLikedEvents] = useState<any[]>([]);
+    const [hostedVisible, setHostedVisible] = useState(PAGE_SIZE);
+    const [likedVisible, setLikedVisible] = useState(PAGE_SIZE);
 
-    async function loadUserData() {
+    const { theme, toggleTheme } = useAppTheme();
+
+    useEffect(() => { load(); }, []);
+
+    async function load() {
         try {
-            const data = await getUser();
-            setUsername(data.username);
-            setFollowers(data.followers ?? 0);
-            setFollowing(data.following ?? 0);
-            setLikes(data.likes ?? 0);
-            // if no followingId, or it matches the logged-in user — own profile
-            setIsOwnProfile(!followingId || followingId === data.id);
+            const [profileData, storedUser] = await Promise.all([
+                getUserProfile(followingId),
+                AsyncStorage.getItem("user").then((s) => (s ? JSON.parse(s) : null)),
+            ]);
+
+            setUsername(profileData.username ?? "");
+            setDisplayName(profileData.display_name ?? profileData.username ?? "");
+            setAvatar(profileData.avatar ?? null);
+            setBio(profileData.bio ?? null);
+            setLink1(profileData.link_1 ?? null);
+            setLink2(profileData.link_2 ?? null);
+            setFollowers(profileData.followers ?? 0);
+            setFollowing(profileData.following ?? 0);
+            setIsPrivate(profileData.private ?? false);
+            setCanViewContent(profileData.canViewContent ?? true);
+            setIsOwnProfile(!followingId || followingId === storedUser?.id);
+
+            const [events, liked] = await Promise.all([
+                fetchHostedEvents(followingId).catch(() => []),
+                fetchLikedEvents().catch(() => []),
+            ]);
+            setHostedEvents(events ?? []);
+            setLikedEvents(liked ?? []);
         } catch (err) {
-            console.error("Failed to get user info", err);
+            console.error("Failed to load profile", err);
         }
     }
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await load();
+        setRefreshing(false);
+    }, [followingId]);
+
+    const showMoreHosted = () => setHostedVisible((v) => v + PAGE_SIZE);
+    const showMoreLiked  = () => setLikedVisible((v) => v + PAGE_SIZE);
 
     const follow = async () => {
         if (!followingId || isOwnProfile) return;
         setFollowed(true);
-        try {
-            await followUser(followingId);
-        } catch {
-            setFollowed(false);
-        }
-    }
+        try { await followUser(followingId); }
+        catch { setFollowed(false); }
+    };
 
     const unfollow = () => setFollowed(false);
 
-    const fetchFollowersCount = async () => {
-        try {
-            const data = await fetchFollowers();
-            setFollowers(data?.length ?? 0);
-        } catch (err) {
-            console.error("Failed to get followers", err);
-        }
-    }
-
-    const fetchFollowingCount = async () => {
-        try {
-            const data = await fetchFollowing();
-            setFollowing(data?.length ?? 0);
-        } catch (err) {
-            console.error("Failed to get following", err);
-        }
-    }
-
-    const fetchMyEvents = async () => {
-        try {
-            return await fetchHostedEvents();
-        } catch (err) {
-            console.error("Failed to get hosted events", err);
-        }
-    }
-
     const handleShare = async () => {
         try {
-            await Share.share({
-                message: `Check out ${username}'s profile on Fuego`,
-            });
+            await Share.share({ message: `Check out ${displayName || username}'s profile on Fuego` });
         } catch (err) {
             console.error("Share failed", err);
         }
-    }
+    };
 
-    const openSettings = () => setShowSettings(true);
-    const closeSettings = () => setShowSettings(false);
-
-    const toggleTheme = () => {
-        setTheme(prev => (prev === "light" ? "dark" : "light"));
-    }
-
-    const goToInactiveScreens = (screenName: string) => {
-        navigation.navigate("inactive", { screen: screenName });
-    }
-
-    const logout = async () => {
-        await AsyncStorage.removeItem("token");
-        await AsyncStorage.removeItem("user");
-        navigation.replace("login");
-    }
+    const openSettings = () => navigation.navigate("Settings");
 
     return {
-        username,
-        followers,
-        following,
-        likes,
-        followed,
-        isOwnProfile,
-        follow,
-        unfollow,
-        fetchFollowersCount,
-        fetchFollowingCount,
-        fetchMyEvents,
+        username, displayName, avatar, bio, link1, link2,
+        followers, following,
+        hostedEvents, likedEvents,
+        hostedVisible, likedVisible,
+        showMoreHosted, showMoreLiked,
+        followed, isOwnProfile,
+        isPrivate, canViewContent,
+        follow, unfollow,
         handleShare,
-        showSettings,
         openSettings,
-        closeSettings,
-        toggleTheme,
-        theme,
-        goToInactiveScreens,
-        logout,
+        theme, toggleTheme,
+        refreshing, onRefresh,
     };
 }

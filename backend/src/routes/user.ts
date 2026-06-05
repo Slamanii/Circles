@@ -1,4 +1,4 @@
-import { getUser, searchUsers, fetchFollowers, fetchFollowing, followUser, fetchEventLikes, fetchHostedEvents } from "../mod/users"
+import { getUser, getUserProfile, searchUsers, fetchFollowers, fetchFollowing, followUser, fetchEventLikes, fetchHostedEvents, fetchLikedEvents, updateProfile } from "../mod/users"
 import { Response } from 'express'
 import { AuthRequest } from "../mod/auth"
 
@@ -22,6 +22,17 @@ export async function getUserRouter(req: AuthRequest, res: Response) {
     } catch (error) {
         console.error(error)
         res.status(500).json({ error: "Failed to fetch user" })
+    }
+}
+
+export async function updateProfileRouter(req: AuthRequest, res: Response) {
+    try {
+        const { display_name, bio, link_1, link_2, location, avatar } = req.body;
+        const result = await updateProfile(req.user!.id, { display_name, bio, link_1, link_2, location, avatar });
+        res.json(result);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to update profile" });
     }
 }
 
@@ -61,8 +72,32 @@ export async function fetchEventLikesRouter(req: AuthRequest, res: Response) {
 
 
 export async function fetchHostedEventsRouter(req: AuthRequest, res: Response) {
-
-    const events = await fetchHostedEvents(req.user!.id)
-
+    const targetId = req.body?.userId || req.user!.id
+    const events = await fetchHostedEvents(targetId)
     res.json(events)
+}
+
+export async function fetchLikedEventsRouter(req: AuthRequest, res: Response) {
+    try {
+        const events = await fetchLikedEvents(req.user!.id)
+        res.json(events)
+    } catch (error) {
+        console.error(error)
+        res.status(500).json({ error: "Failed to fetch liked events" })
+    }
+}
+
+export async function getUserProfileRouter(req: AuthRequest, res: Response) {
+    try {
+        const viewerId = req.user!.id;
+        const targetId = (req.query.id as string) || viewerId;
+        // Own profile — no privacy check needed
+        const user = targetId === viewerId
+            ? await getUser(targetId)
+            : await getUserProfile(targetId, viewerId);
+        res.json(user);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to fetch user profile" });
+    }
 }

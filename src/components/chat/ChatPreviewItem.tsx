@@ -1,4 +1,6 @@
 import { View, Text, TouchableOpacity, Image } from "react-native"
+import { useAppTheme } from "../../context/ThemeContext"
+import { getColors } from "../../shared/theme"
 
 export function ChatPreviewItem({
     groupName,
@@ -10,6 +12,9 @@ export function ChatPreviewItem({
     onPress,
     onLongPress,
 }: any) {
+    const { theme } = useAppTheme();
+    const C = getColors(theme);
+
     return (
         <TouchableOpacity
             onPress={onPress}
@@ -20,10 +25,10 @@ export function ChatPreviewItem({
                 paddingVertical: 12,
                 paddingHorizontal: 16,
                 borderBottomWidth: 0.5,
-                borderBottomColor: "#ddd"
+                borderBottomColor: theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.12)",
             }}
         >
-            <Image 
+            <Image
                 source={image}
                 style={{
                     width: 50,
@@ -34,32 +39,32 @@ export function ChatPreviewItem({
             />
 
             <View style={{ flex: 1 }}>
-                <Text style={{ fontWeight: "bold", fontSize: 16 }}>
+                <Text style={{ fontWeight: "bold", fontSize: 16, color: C.text }}>
                     {groupName}
                 </Text>
 
-                <Text 
+                <Text
                     numberOfLines={1}
                     style={{
-                        color: muted ? "gray" : "#444",
+                        color: muted ? C.textMuted : C.textSecondary,
                         marginTop: 2,
                     }}
-                    >
+                >
                     {muted ? "🔇 " : ""}
                     {lastMessage}
                 </Text>
             </View>
 
             <View style={{ alignItems: "flex-end" }}>
-                    <Text style={{ color: "gray", fontSize: 12 }}>
-                        {time}
-                    </Text>
+                <Text style={{ color: C.textSecondary, fontSize: 12 }}>
+                    {time}
+                </Text>
 
-                    {pinned && (
-                        <Text style={{ marginTop: 4 }}>
-                            📌
-                        </Text> 
-                    )}
+                {pinned && (
+                    <Text style={{ marginTop: 4 }}>
+                        📌
+                    </Text>
+                )}
             </View>
         </TouchableOpacity>
     );

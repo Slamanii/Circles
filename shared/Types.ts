@@ -99,7 +99,7 @@ export type Message = {
   senderId: string;
   senderName: string;
   content: string;
-  type: "text" | "image" | "video" | "system";
+  type: "text" | "image" | "video" | "audio" | "system";
   time: string;
   date: string;
   isPinned?: boolean;
@@ -183,8 +183,11 @@ export type User = {
     symbol: any;
     chart: any;
     balance: number;
+    decimals: number;
     priceInSol: number;
     priceInUSD: number;
+    logoURI?: string;
+    tokenAccount?: string;
 };
 
 export type WalletTokens = {

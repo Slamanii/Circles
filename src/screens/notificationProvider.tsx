@@ -15,8 +15,10 @@ Notifications.setNotificationHandler({
 
 export default function NotificationListener({ userId }: { userId: string }) {
     useEffect(() => {
-        // Request permission + register push token once on mount
-        registerForPushNotifications().catch(console.error);
+        // Requires EAS projectId in app.json — set up during eas init before enabling
+        if (process.env.EXPO_PUBLIC_EAS_PROJECT_ID) {
+            registerForPushNotifications().catch(console.error);
+        }
 
         // Realtime DB subscription → fires local push when notification row inserted
         const channel = subscribeToNotifications(userId);

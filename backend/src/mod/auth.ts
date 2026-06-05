@@ -17,6 +17,15 @@ export interface AuthRequest extends Request {
     };
 }
 
+export function requireCronSecret(req: Request, res: Response, next: NextFunction) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return res.status(500).json({ error: "CRON_SECRET not configured" });
+    if (req.headers.authorization !== `Bearer ${secret}`) {
+        return res.status(401).json({ error: "Unauthorized" });
+    }
+    next();
+}
+
 export async function requireUser(req: AuthRequest, res: Response, next: NextFunction) {
     const token = req.headers.authorization?.replace("Bearer ", "");
     if (!token) return res.status(401).json({ error: "Missing token" });
@@ -47,9 +56,9 @@ export async function loginOrSignup(email: string, password: string) {
         .single();
 
     if (!user) {
-        // Signup
         const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
         const wallet = generateSolanaWallet();
+        const encrypted_private_key = encryptPrivateKey(wallet.secretKey);
 
         const { data, error } = await supabase
             .from("users")
@@ -59,6 +68,7 @@ export async function loginOrSignup(email: string, password: string) {
                 username: email.split("@")[0],
                 display_name: email.split("@")[0],
                 address: wallet.publicKey,
+                encrypted_private_key,
             })
             .select()
             .single();
@@ -66,7 +76,6 @@ export async function loginOrSignup(email: string, password: string) {
         if (error) throw error;
         user = data;
     } else {
-        // Login
         if (!user.password_hash) {
             throw new Error("This account uses wallet login");
         }
@@ -79,7 +88,6 @@ export async function loginOrSignup(email: string, password: string) {
 }
 
 export async function resetPassword(email: string, newPassword: string, resetToken: string) {
-    // Verify the reset token (stored in DB after OTP flow)
     const { data: record } = await supabase
         .from("password_resets")
         .select("*")
@@ -95,13 +103,49 @@ export async function resetPassword(email: string, newPassword: string, resetTok
     await supabase.from("password_resets").delete().eq("email", email);
 }
 
+// ── Nonce ────────────────────────────────────────────────────────────────────
+
+export function getNonce(req: Request, res: Response) {
+    const { wallet } = req.query as { wallet?: string };
+    if (!wallet) return res.status(400).json({ error: "wallet address required" });
+
+    const nonceToken = jwt.sign(
+        { wallet, nonce: crypto.randomBytes(16).toString("hex") },
+        process.env.JWT_SECRET!,
+        { expiresIn: "2m" },
+    );
+
+    res.json({ nonceToken });
+}
+
 // ── Wallet auth ──────────────────────────────────────────────────────────────
 
 export async function walletLogin(req: Request, res: Response) {
-    const { walletAddress, signature, message } = req.body;
+    const { walletAddress, signature, message, nonceToken } = req.body;
 
-    if (!walletAddress || !signature || !message) {
+    if (!walletAddress || !signature || !message || !nonceToken) {
         return res.status(400).json({ error: "Missing fields" });
+    }
+
+    // Verify nonce JWT — checks expiry and that it was issued for this address
+    let nonce: string;
+    try {
+        const decoded = jwt.verify(nonceToken, process.env.JWT_SECRET!) as {
+            wallet: string;
+            nonce: string;
+        };
+        if (decoded.wallet !== walletAddress) {
+            return res.status(401).json({ error: "Nonce wallet mismatch" });
+        }
+        nonce = decoded.nonce;
+    } catch {
+        return res.status(401).json({ error: "Invalid or expired nonce" });
+    }
+
+    // Confirm the signed message contains the nonce
+    const expectedMessage = `Login to Fuego\nNonce: ${nonce}`;
+    if (message !== expectedMessage) {
+        return res.status(401).json({ error: "Message mismatch" });
     }
 
     try {
@@ -109,7 +153,7 @@ export async function walletLogin(req: Request, res: Response) {
         const verified = nacl.sign.detached.verify(
             new TextEncoder().encode(message),
             bs58.decode(signature),
-            publicKey.toBytes()
+            publicKey.toBytes(),
         );
 
         if (!verified) return res.status(401).json({ error: "Invalid signature" });
@@ -148,7 +192,6 @@ export async function savePushToken(req: AuthRequest, res: Response) {
 
     if (!token) return res.status(400).json({ error: "Missing token" });
 
-    // Upsert — one row per user (replace old token on re-register)
     await supabase
         .from("push_tokens")
         .upsert({ user_id: userId, token }, { onConflict: "user_id" });
@@ -163,7 +206,7 @@ export function encryptPrivateKey(secretKey: string) {
     const cipher = crypto.createCipheriv(
         "aes-256-cbc",
         Buffer.from(process.env.WALLET_ENCRYPTION_KEY!, "hex"),
-        iv
+        iv,
     );
     let encrypted = cipher.update(secretKey, "utf8", "hex");
     encrypted += cipher.final("hex");
@@ -175,7 +218,7 @@ export function decryptPrivateKey(encryptedKey: string) {
     const decipher = crypto.createDecipheriv(
         "aes-256-cbc",
         Buffer.from(process.env.WALLET_ENCRYPTION_KEY!, "hex"),
-        Buffer.from(ivHex, "hex")
+        Buffer.from(ivHex, "hex"),
     );
     let decrypted = decipher.update(encrypted, "hex", "utf8");
     decrypted += decipher.final("utf8");

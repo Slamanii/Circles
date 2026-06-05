@@ -1,25 +1,49 @@
+import { Audio } from "expo-av";
+import * as ImagePicker from "expo-image-picker";
 import { useEffect, useRef, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Share, StyleSheet, View } from "react-native";
+import { useAppTheme } from "../../context/ThemeContext";
+import { getColors } from "../../shared/theme";
+
 import { Message } from "../../../shared/Types";
 import { ChatHeader } from "../../components/chat/ChatHeader";
 import { MessageInput } from "../../components/chat/MessageInput";
 import { MessageList } from "../../components/chat/MessageList";
 import { fetchMessages, sendMessage, deleteMessage, pinMessage } from "../../services/chatService";
 import { subscribeToNotifications } from "../../services/notifications";
-import { supabase } from "../../../backend/src/services/supabase";
+import { uploadMedia } from "../../services/upload";
+import { supabase } from "../../services/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export function ChatScreen({ route, navigation }: any) {
+    const C = getColors(useAppTheme().theme);
 
     const { group } = route.params;
     const groupId: string = group.id ?? group.groupId;
 
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
+    const [recording, setRecording] = useState(false);
     const userIdRef = useRef<string | null>(null);
     const notifChannelRef = useRef<any>(null);
+    const recorderRef = useRef<Audio.Recording | null>(null);
 
     useEffect(() => {
+        const mapMessage = (m: any, myId: string | null): Message => ({
+            id: m.id,
+            senderId: m.sender_id,
+            senderName: m.senderName ?? m.users?.username ?? "Unknown",
+            content: m.content,
+            type: m.type ?? "text",
+            media: m.media ?? undefined,
+            time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            date: m.created_at,
+            isMine: m.sender_id === myId,
+            isPinned: m.is_pinned ?? false,
+            deleted: m.deleted ?? false,
+            status: m.status ?? "sent",
+        });
+
         const channel = supabase
             .channel(`group-${groupId}`)
             .on("postgres_changes", {
@@ -28,18 +52,7 @@ export function ChatScreen({ route, navigation }: any) {
                 table: "messages",
                 filter: `group_id=eq.${groupId}`,
             }, (payload) => {
-                const m = payload.new as any;
-                setMessages(prev => [...prev, {
-                    id: m.id,
-                    senderId: m.sender_id,
-                    senderName: m.users?.username ?? "Unknown",
-                    content: m.content,
-                    type: "text",
-                    time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                    date: m.created_at,
-                    isMine: m.sender_id === userIdRef.current,
-                    status: "sent",
-                }]);
+                setMessages(prev => [...prev, mapMessage(payload.new, userIdRef.current)]);
             })
             .subscribe();
 
@@ -52,18 +65,7 @@ export function ChatScreen({ route, navigation }: any) {
                     notifChannelRef.current = subscribeToNotifications(userIdRef.current);
                 }
                 const data = await fetchMessages(groupId);
-                const mapped: Message[] = (data.messages ?? []).reverse().map((m: any) => ({
-                    id: m.id,
-                    senderId: m.sender_id,
-                    senderName: m.users?.username ?? "Unknown",
-                    content: m.content,
-                    type: "text",
-                    time: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                    date: m.created_at,
-                    isMine: m.sender_id === userIdRef.current,
-                    status: "read",
-                }));
-                setMessages(mapped);
+                setMessages((data.messages ?? []).reverse().map((m: any) => mapMessage(m, userIdRef.current)));
             } catch (err) {
                 console.error("Failed to load messages", err);
             }
@@ -133,6 +135,52 @@ export function ChatScreen({ route, navigation }: any) {
         }
     };
 
+    const handlePickMedia = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ["images", "videos"],
+            quality: 0.8,
+        });
+        if (result.canceled || !result.assets[0]) return;
+        const asset = result.assets[0];
+        const isVideo = asset.type === "video";
+        const ext = isVideo ? "mp4" : "jpg";
+        const contentType = isVideo ? "video/mp4" : "image/jpeg";
+        try {
+            const uri = await uploadMedia(asset.uri, "chat", `chat.${ext}`, contentType);
+            await sendMessage(groupId, uri, isVideo ? "video" : "image", { uri });
+        } catch {
+            Alert.alert("Failed to send media");
+        }
+    };
+
+    const handleRecordAudio = async () => {
+        if (recording) {
+            try {
+                await recorderRef.current?.stopAndUnloadAsync();
+                const uri = recorderRef.current?.getURI();
+                recorderRef.current = null;
+                setRecording(false);
+                if (!uri) return;
+                const publicUri = await uploadMedia(uri, "chat", "voice.m4a", "audio/mp4");
+                await sendMessage(groupId, publicUri, "audio", { uri: publicUri });
+            } catch {
+                Alert.alert("Failed to send voice message");
+            }
+        } else {
+            try {
+                await Audio.requestPermissionsAsync();
+                await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+                const { recording: rec } = await Audio.Recording.createAsync(
+                    Audio.RecordingOptionsPresets.HIGH_QUALITY
+                );
+                recorderRef.current = rec;
+                setRecording(true);
+            } catch {
+                Alert.alert("Microphone permission required");
+            }
+        }
+    };
+
     const handleSend = async () => {
         if (!input.trim()) return;
         const content = input.trim();
@@ -145,11 +193,11 @@ export function ChatScreen({ route, navigation }: any) {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: C.background }]}>
             <ChatHeader
                 groupId={groupId}
                 groupName={group.name ?? group.groupName}
-                groupImage={group.groupImage ?? null}
+                groupImage={group.group_image ?? group.groupImage ?? null}
                 onBack={() => navigation.goBack()}
                 onOpenControl={() => navigation.navigate("ChatControl", { groupId })}
             />
@@ -168,8 +216,9 @@ export function ChatScreen({ route, navigation }: any) {
                     value={input}
                     onChange={setInput}
                     onSend={handleSend}
-                    onPickImage={() => console.log("Pick image")}
-                    onPickVideo={() => console.log("Pick video")}
+                    onPickImage={handlePickMedia}
+                    onRecordAudio={handleRecordAudio}
+                    recording={recording}
                 />
             </KeyboardAvoidingView>
         </View>

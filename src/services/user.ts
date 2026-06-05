@@ -26,6 +26,15 @@ export async function getUser() {
     return await res.json();
 }
 
+export async function getUserProfile(id?: string) {
+    const url = id
+        ? `${API_URL}/api/get-user-profile?id=${encodeURIComponent(id)}`
+        : `${API_URL}/api/get-user`;
+    const res = await fetch(url, { headers: await authHeaders() });
+    if (!res.ok) throw new Error("Failed to fetch user profile");
+    return await res.json();
+}
+
 export async function fetchFollowers() {
     try {
         const res = await fetch(`${API_URL}/api/fetch-followers`, {
@@ -52,16 +61,29 @@ export async function fetchFollowing() {
     }
 }
 
-export async function fetchHostedEvents() {
+export async function fetchHostedEvents(userId?: string) {
     try {
         const res = await fetch(`${API_URL}/api/fetch-hosted-events`, {
             method: "POST",
             headers: await authHeaders(),
+            body: userId ? JSON.stringify({ userId }) : undefined,
         });
         if (!res.ok) throw new Error("Failed to load hosted events");
         return await res.json();
     } catch (err) {
         console.error("fetchHostedEvents error:", err);
+    }
+}
+
+export async function fetchLikedEvents() {
+    try {
+        const res = await fetch(`${API_URL}/api/fetch-liked-events`, {
+            headers: await authHeaders(),
+        });
+        if (!res.ok) throw new Error("Failed to load liked events");
+        return await res.json();
+    } catch (err) {
+        console.error("fetchLikedEvents error:", err);
     }
 }
 
@@ -77,6 +99,24 @@ export async function fetchEventLikes(eventId: string) {
     } catch (err) {
         console.error("fetchEventLikes error:", err);
     }
+}
+
+export async function updateProfile(data: {
+    display_name?: string;
+    bio?: string;
+    link_1?: string;
+    link_2?: string;
+    location?: string;
+    avatar?: string;
+    private?: boolean;
+}) {
+    const res = await fetch(`${API_URL}/api/update-profile`, {
+        method: "PUT",
+        headers: await authHeaders(),
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error("Failed to update profile");
+    return await res.json();
 }
 
 export async function followUser(followingData: string) {

@@ -1,9 +1,15 @@
 import { useState } from "react";
-import { Button, FlatList, Image, Text, View, StyleSheet } from "react-native";
+import { Button, FlatList, Image, Text, TouchableOpacity, View, StyleSheet } from "react-native";
+import { useAppTheme } from "../../context/ThemeContext";
+import { getColors } from "../../shared/theme";
+import { useNavigation } from "@react-navigation/native";
 import { useStoryPicker, StoryMedia } from "../../hooks/useStoryUpload";
 import { createStory } from "../../services/story";
+import { uploadMedia } from "../../services/upload";
 
 export default function StoryUploadScreen() {
+    const navigation = useNavigation();
+    const C = getColors(useAppTheme().theme);
     const { pickFromCamera, pickFromGallery, loading } = useStoryPicker();
     const [selectedFiles, setSelectedFiles] = useState<StoryMedia[]>([]);
     const [uploading, setUploading] = useState(false);
@@ -22,14 +28,17 @@ export default function StoryUploadScreen() {
         if (!selectedFiles.length) return;
         setUploading(true);
         try {
-            await createStory({
-                mediaFiles: selectedFiles.map(f => ({
-                    uri: f.preview || f.file.name,
-                    type: f.type,
-                    caption: f.caption ?? "",
-                })),
-            });
+            const uploaded = await Promise.all(
+                selectedFiles.map(async (f) => {
+                    const ext = f.type === "video" ? "mp4" : "jpg";
+                    const contentType = f.type === "video" ? "video/mp4" : "image/jpeg";
+                    const mediaUrl = await uploadMedia(f.uri, "stories", `story.${ext}`, contentType);
+                    return { mediaUrl, type: f.type, caption: f.caption };
+                })
+            );
+            await createStory({ mediaFiles: uploaded });
             setSelectedFiles([]);
+            navigation.goBack();
         } catch (err) {
             console.error("Upload failed", err);
         } finally {
@@ -38,7 +47,10 @@ export default function StoryUploadScreen() {
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: C.background }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginBottom: 8 }}>
+                <Text style={{ fontSize: 18, color: C.text }}>←</Text>
+            </TouchableOpacity>
             <Button title="Pick from Gallery" onPress={handlePickGallery} disabled={loading} />
             <Button title="Open Camera" onPress={handlePickCamera} disabled={loading} />
             <FlatList
@@ -48,15 +60,17 @@ export default function StoryUploadScreen() {
                 renderItem={({ item }) => (
                     <View style={styles.preview}>
                         {item.type === "image" ? (
-                            <Image source={{ uri: item.preview || item.file.name }} style={styles.previewImage} />
+                            <Image source={{ uri: item.preview ?? item.uri }} style={styles.previewImage} />
                         ) : (
-                            <Text style={styles.videoLabel}>Video</Text>
+                            <View style={[styles.preview, { backgroundColor: C.surface, alignItems: "center", justifyContent: "center" }]}>
+                                <Text style={{ color: C.textSecondary }}>Video</Text>
+                            </View>
                         )}
                     </View>
                 )}
             />
             <Button
-                title={uploading ? "Uploading..." : "Upload Story"}
+                title={uploading ? "Uploading..." : "Share Story"}
                 onPress={handleUpload}
                 disabled={uploading || selectedFiles.length === 0}
             />
@@ -68,5 +82,4 @@ const styles = StyleSheet.create({
     container: { flex: 1, padding: 20, gap: 12 },
     preview: { margin: 8, width: 100, height: 100, borderRadius: 8, overflow: "hidden" },
     previewImage: { width: "100%", height: "100%" },
-    videoLabel: { textAlign: "center", marginTop: 40 },
 });

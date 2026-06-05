@@ -1,21 +1,18 @@
-create table messages (
-    id uuid primary key default gen_random_uuid(),
-    group_id uuid not null references groups(id) on delete cascade,
-    sender_id uuid references user(id),
-    senderName text not null,
-    content text not null,
-    type text not null
-        check (type in ("text", "image", "video", "system")),
-    status text not null
-        check (status in("sending", "sent", "delivered", "read")),
-    media jsonb default text,
-    file_url default text,
-    deleted boolean default false,
-    deleted_for uuid[] default '{}',
-    is_pinned boolean default false,
+CREATE TABLE messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id UUID NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    senderName TEXT NOT NULL,
+    content TEXT NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('text', 'image', 'video', 'system')),
+    status TEXT NOT NULL CHECK (status IN ('sending', 'sent', 'delivered', 'read')),
+    media JSONB,
+    file_url TEXT,
+    deleted BOOLEAN DEFAULT FALSE,
+    deleted_for UUID[] DEFAULT '{}',
+    is_pinned BOOLEAN DEFAULT FALSE,
     edited_at TIMESTAMPTZ,
-    created_at timestamptz default now(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE INDEX idx_messages_group_id ON messages(group_id);
-CREATE INDEX idx_group_members_user_id ON group_members(user_id);

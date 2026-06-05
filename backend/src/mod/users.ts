@@ -9,6 +9,10 @@ export async function getUser(userId: string) {
             email,
             username,
             display_name,
+            bio,
+            link_1,
+            link_2,
+            location,
             avatar,
             wallet_id,
             address,
@@ -25,6 +29,48 @@ export async function getUser(userId: string) {
     if (error) throw error
 
     return data
+}
+
+export async function getUserProfile(targetId: string, viewerId: string) {
+    const { data: user, error } = await supabase
+        .from("users")
+        .select("id, username, display_name, bio, link_1, link_2, location, avatar, verified, private, followers, following")
+        .eq("id", targetId)
+        .single();
+
+    if (error) throw error;
+
+    // For a private account, content is visible only to people the account owner follows.
+    // Check: does targetId follow viewerId?
+    const { count } = await supabase
+        .from("follows")
+        .select("id", { count: "exact", head: true })
+        .eq("follower_id", targetId)
+        .eq("following_id", viewerId);
+
+    const canViewContent = !user.private || viewerId === targetId || (count ?? 0) > 0;
+
+    return { ...user, canViewContent };
+}
+
+export async function updateProfile(userId: string, data: {
+    display_name?: string;
+    bio?: string;
+    link_1?: string;
+    link_2?: string;
+    location?: string;
+    avatar?: string;
+    private?: boolean;
+}) {
+    const { data: user, error } = await supabase
+        .from("users")
+        .update(data)
+        .eq("id", userId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return user;
 }
 
 export async function searchUsers(query: string) {
@@ -120,9 +166,32 @@ export async function fetchHostedEvents(userId: string) {
     .select("*")
     .eq("creator_id", userId)
     .order("created_at", { ascending: false })
-    .limit(5)
+    .limit(100)
 
   if (error) throw error
 
   return data ?? []
+}
+
+export async function fetchLikedEvents(userId: string) {
+
+  const { data, error } = await supabase
+    .from("event_likes")
+    .select(`
+      event_id,
+      events (
+        id,
+        title,
+        flyer_card,
+        venue,
+        event_date
+      )
+    `)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(100)
+
+  if (error) throw error
+
+  return (data ?? []).map((item: any) => item.events).filter(Boolean)
 }

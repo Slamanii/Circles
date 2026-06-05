@@ -1,6 +1,8 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useAppTheme } from "../context/ThemeContext";
 import { Event } from "../hooks/useEvents";
-import { useCountdown } from "../hooks/useCountdown";
+import { Colors, Radius, getColors } from "../shared/theme";
 
 type Props = {
     event: Event;
@@ -12,164 +14,172 @@ type Props = {
 };
 
 export default function EventCard({ event, liked, saved, onLike, onPreSave, onGetTicket }: Props) {
-    const { display, expired } = useCountdown(event.event_date);
+    const C = getColors(useAppTheme().theme);
+
+    const dateLabel = event.event_date
+        ? new Date(event.event_date).toLocaleDateString("en-GB", {
+              weekday: "short", month: "short", day: "numeric",
+          })
+        : "TBA";
 
     return (
-        <TouchableOpacity style={styles.card} activeOpacity={0.85}>
-
-            {/* Flyer placeholder */}
-            <View style={styles.flyer}>
-                <Text style={styles.flyerText}>{event.title[0]}</Text>
-            </View>
+        <View style={[styles.card, { backgroundColor: C.card }]}>
 
             <View style={styles.body}>
-                <Text style={styles.title}>{event.title}</Text>
-                <Text style={styles.venue}>{event.venue}</Text>
-                <Text style={styles.description} numberOfLines={2}>{event.description}</Text>
-                <Text style={styles.price}>₦{event.ticket_price.toLocaleString()}</Text>
+                {/* Left: info + price */}
+                <View style={styles.info}>
+                    <Text style={[styles.title, { color: C.text }]} numberOfLines={2}>
+                        {event.title}
+                    </Text>
 
-                {/* Countdown line */}
-                <View style={[styles.countdownRow, expired && styles.countdownExpired]}>
-                    <Text style={styles.countdownLabel}>{expired ? "Event ended" : "Starts in"}</Text>
-                    {!expired && <Text style={styles.countdownValue}>{display}</Text>}
+                    <View style={styles.metaRow}>
+                        <Ionicons name="calendar-outline" size={13} color={C.textSecondary} />
+                        <Text style={[styles.metaText, { color: C.textSecondary }]}>{dateLabel}</Text>
+                    </View>
+
+                    <View style={styles.metaRow}>
+                        <Ionicons name="location-outline" size={13} color={C.textSecondary} />
+                        <Text style={[styles.metaText, { color: C.textSecondary }]} numberOfLines={1}>
+                            {event.venue ?? "TBA"}
+                        </Text>
+                    </View>
+
+                    <Text style={[styles.price, { color: C.text }]}>
+                        ₦{Number(event.ticket_price ?? 0).toLocaleString()}
+                    </Text>
                 </View>
 
-                <View style={styles.actions}>
-                    <TouchableOpacity
-                        onPress={onLike}
-                        style={[styles.actionBtn, liked && styles.actionBtnActive]}
-                    >
-                        <Text style={[styles.actionText, liked && styles.actionTextActive]}>
-                            {liked ? "Liked" : "Like"}
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        onPress={onPreSave}
-                        style={[styles.actionBtn, saved && styles.actionBtnActive]}
-                    >
-                        <Text style={[styles.actionText, saved && styles.actionTextActive]}>
-                            {saved ? "Saved" : "Pre-save"}
-                        </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        onPress={onGetTicket}
-                        disabled={expired}
-                        style={[styles.ticketBtn, expired && styles.ticketBtnDisabled]}
-                    >
-                        <Text style={styles.ticketText}>
-                            {expired ? "Sold out" : "Get Ticket"}
-                        </Text>
-                    </TouchableOpacity>
+                {/* Right: flyer */}
+                <View style={styles.flyerCol}>
+                    {event.flyer_card ? (
+                        <Image source={{ uri: event.flyer_card }} style={styles.flyer} />
+                    ) : (
+                        <View style={styles.flyerPlaceholder}>
+                            <Text style={styles.flyerInitial}>
+                                {event.title?.[0]?.toUpperCase() ?? "E"}
+                            </Text>
+                        </View>
+                    )}
                 </View>
             </View>
 
-        </TouchableOpacity>
+            <View style={[styles.divider, { backgroundColor: C.border }]} />
+
+            {/* Actions */}
+            <View style={styles.actions}>
+                <TouchableOpacity onPress={onPreSave} style={styles.iconBtn}>
+                    <Ionicons
+                        name={saved ? "bookmark" : "bookmark-outline"}
+                        size={21}
+                        color={saved ? Colors.accent : C.textSecondary}
+                    />
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={onLike} style={styles.iconBtn}>
+                    <Ionicons
+                        name={liked ? "heart" : "heart-outline"}
+                        size={21}
+                        color={liked ? "#EF4444" : C.textSecondary}
+                    />
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={onGetTicket} style={styles.ticketBtn}>
+                    <Text style={styles.ticketText}>Get Tickets</Text>
+                </TouchableOpacity>
+            </View>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: "#1E293B",
-        borderRadius: 14,
+        borderRadius: Radius.xl,
         marginHorizontal: 16,
         marginBottom: 16,
-        overflow: "hidden",
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.11,
+        shadowRadius: 18,
+        elevation: 8,
+    },
+    body: {
+        flexDirection: "row",
+        padding: 16,
+        gap: 14,
+    },
+    info: {
+        flex: 1,
+        gap: 7,
+        justifyContent: "center",
+    },
+    title: {
+        fontSize: 17,
+        fontWeight: "800",
+        lineHeight: 22,
+    },
+    metaRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 5,
+    },
+    metaText: {
+        fontSize: 12,
+        flex: 1,
+    },
+    price: {
+        fontSize: 15,
+        fontWeight: "700",
+        marginTop: 2,
+    },
+    flyerCol: {
+        justifyContent: "center",
     },
     flyer: {
-        height: 140,
-        backgroundColor: "#0F172A",
+        width: 90,
+        height: 100,
+        borderRadius: Radius.md,
+    },
+    flyerPlaceholder: {
+        width: 90,
+        height: 100,
+        borderRadius: Radius.md,
+        backgroundColor: Colors.accent + "18",
+        borderWidth: 1.5,
+        borderColor: Colors.accent + "50",
         justifyContent: "center",
         alignItems: "center",
     },
-    flyerText: {
-        color: "#3B82F6",
-        fontSize: 48,
-        fontWeight: "bold",
+    flyerInitial: {
+        fontSize: 32,
+        fontWeight: "800",
+        color: Colors.accent,
     },
-    body: {
-        padding: 14,
-    },
-    title: {
-        color: "white",
-        fontSize: 17,
-        fontWeight: "700",
-        marginBottom: 2,
-    },
-    venue: {
-        color: "#64748B",
-        fontSize: 12,
-        marginBottom: 6,
-    },
-    description: {
-        color: "#94A3B8",
-        fontSize: 13,
-        marginBottom: 8,
-    },
-    price: {
-        color: "#60A5FA",
-        fontWeight: "600",
-        marginBottom: 10,
-    },
-    countdownRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: "#0F172A",
-        borderRadius: 8,
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        marginBottom: 12,
-        gap: 8,
-    },
-    countdownExpired: {
-        backgroundColor: "#1f0a0a",
-    },
-    countdownLabel: {
-        color: "#64748B",
-        fontSize: 11,
-    },
-    countdownValue: {
-        color: "#F1F5F9",
-        fontSize: 12,
-        fontWeight: "600",
-        fontVariant: ["tabular-nums"],
+    divider: {
+        height: StyleSheet.hairlineWidth,
+        marginHorizontal: 16,
     },
     actions: {
         flexDirection: "row",
-        gap: 8,
-    },
-    actionBtn: {
-        flex: 1,
-        paddingVertical: 8,
-        borderRadius: 8,
-        backgroundColor: "#334155",
         alignItems: "center",
+        paddingHorizontal: 16,
+        paddingVertical: 11,
+        gap: 10,
     },
-    actionBtnActive: {
-        backgroundColor: "#1D4ED8",
-    },
-    actionText: {
-        color: "#94A3B8",
-        fontSize: 12,
-        fontWeight: "600",
-    },
-    actionTextActive: {
-        color: "white",
+    iconBtn: {
+        padding: 4,
     },
     ticketBtn: {
-        flex: 1.4,
-        paddingVertical: 8,
-        borderRadius: 8,
-        backgroundColor: "#3B82F6",
+        flex: 1,
+        backgroundColor: Colors.accent,
+        borderRadius: Radius.full,
+        paddingVertical: 10,
         alignItems: "center",
-    },
-    ticketBtnDisabled: {
-        backgroundColor: "#334155",
+        marginLeft: 6,
     },
     ticketText: {
-        color: "white",
-        fontSize: 12,
+        color: Colors.white,
+        fontSize: 14,
         fontWeight: "700",
+        letterSpacing: 0.3,
     },
 });

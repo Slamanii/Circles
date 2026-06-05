@@ -13,7 +13,7 @@ CREATE TABLE notifications (
 
 CREATE TABLE push_tokens (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
   token TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { supabase } from "../../../backend/src/services/supabase";
+import { supabase } from "../supabase";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 const HELIUS_RPC_URL = process.env.EXPO_PUBLIC_HELIUS_RPC_URL!;
