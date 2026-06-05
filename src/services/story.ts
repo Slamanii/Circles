@@ -10,7 +10,9 @@ async function authHeaders() {
     };
 }
 
-export async function createStory(storyData: any) {
+export async function createStory(storyData: {
+    mediaFiles: { mediaUrl: string; type: "image" | "video"; caption?: string }[];
+}) {
     try {
         const res = await fetch(`${API_URL}/api/create-story`, {
             method: "POST",
@@ -130,6 +132,19 @@ export async function fetchStoryByUser() {
         return await res.json();
     } catch (err) {
         console.error("fetchStoryByUser error:", err);
+    }
+}
+
+export async function fetchDiscoverStories() {
+    try {
+        const res = await fetch(`${API_URL}/api/fetch-discover-stories`, {
+            method: "GET",
+            headers: await authHeaders(),
+        });
+        if (!res.ok) throw new Error("Failed to fetch discover stories");
+        return await res.json();
+    } catch (err) {
+        console.error("fetchDiscoverStories error:", err);
     }
 }
 

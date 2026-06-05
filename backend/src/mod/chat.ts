@@ -20,7 +20,7 @@ export async function createGroupChat(
 
         await supabase.from("group_members").insert({
             group_id: group.id,
-            userId: creatorId,
+            user_id: creatorId,
             role: "admin",
         })
 
@@ -72,15 +72,18 @@ export async function getGroup(groupId: string, userId: string) {
 }
 
 export async function sendMessage({
-    groupId, 
+    groupId,
     userId,
     content,
+    type = "text",
+    media,
 }: {
     groupId: string;
     userId: string;
     content: string;
+    type?: "text" | "image" | "video" | "audio";
+    media?: { uri: string; thumbnail?: string; duration?: number };
 }) {
-
     const { data: member } = await supabase
         .from("group_members")
         .select("id")
@@ -88,17 +91,24 @@ export async function sendMessage({
         .eq("user_id", userId)
         .single();
 
-    if (!member) {
-        throw new Error("Not a group member");
-    }
+    if (!member) throw new Error("Not a group member");
+
+    const { data: user } = await supabase
+        .from("users")
+        .select("username, display_name")
+        .eq("id", userId)
+        .single();
 
     const { data: message, error } = await supabase
         .from("messages")
         .insert({
-            groupId: groupId,
-            senderId: userId,
+            group_id: groupId,
+            sender_id: userId,
+            senderName: user?.display_name ?? user?.username ?? "Unknown",
             content,
-            type: "text",
+            type,
+            media: media ?? null,
+            status: "sent",
         })
         .select()
         .single();
@@ -395,8 +405,9 @@ export async function fetchUserGroups(userId: string) {
             groups (
                 id,
                 name,
-                event_id,
+                group_image,
                 is_event_group,
+                event_id,
                 messages (
                     content,
                     created_at
@@ -404,7 +415,7 @@ export async function fetchUserGroups(userId: string) {
             )
         `)
         .eq("user_id", userId)
-        .order("created_at", { ascending: false })
+        .order("joined_at", { ascending: false })
 
     if (error) throw error
     return data

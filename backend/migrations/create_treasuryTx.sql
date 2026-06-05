@@ -5,5 +5,5 @@ create table tx_history (
     asset_id text,
     action text,
     to_wallet text,
-    created_at timestamptz default now(),
-)
+    created_at timestamptz default now()
+);

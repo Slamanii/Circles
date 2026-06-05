@@ -1,5 +1,7 @@
 import { FlatList, Text, View } from "react-native"
 import { MessageBubble } from "./MessageBubble"
+import { useAppTheme } from "../../context/ThemeContext"
+import { getColors } from "../../shared/theme"
 
 type Props = {
     messages: any[];
@@ -9,6 +11,7 @@ type Props = {
 };
 
 export function MessageList({ messages, onDelete, onShare, onPin }: Props) {
+    const C = getColors(useAppTheme().theme);
 
     const renderItem = ({ item, index }: any) => {
         const prev = messages[index - 1];
@@ -17,7 +20,7 @@ export function MessageList({ messages, onDelete, onShare, onPin }: Props) {
         return (
             <View>
                 {showDate && (
-                    <Text style={{ alignSelf: "center", marginVertical: 10, color: "gray" }}>
+                    <Text style={{ alignSelf: "center", marginVertical: 10, color: C.textSecondary }}>
                         {item.date}
                     </Text>
                 )}

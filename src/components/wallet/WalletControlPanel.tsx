@@ -1,16 +1,71 @@
-import { Button, Text, View, } from "react-native"
-import { WalletControlPanelType } from "../../../shared/Types"
+import { Ionicons } from "@expo/vector-icons";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { WalletControlPanelType } from "../../../shared/Types";
 
+type ActionBtnProps = {
+    icon: React.ComponentProps<typeof Ionicons>["name"];
+    label: string;
+    onPress: () => void;
+};
+
+function ActionBtn({ icon, label, onPress }: ActionBtnProps) {
+    return (
+        <TouchableOpacity style={styles.actionBtn} onPress={onPress} activeOpacity={0.75}>
+            <Ionicons name={icon} size={30} color="#E8622A" />
+            <Text style={styles.actionLabel}>{label}</Text>
+        </TouchableOpacity>
+    );
+}
 
 export function WalletControlPanel({ balance, onReceive, onSend, onSwap, onBuy }: WalletControlPanelType) {
-
     return (
-        <View>
-            <Text>{balance}</Text>
-            <Button title="receive" onPress={onReceive} />
-            <Button title="send" onPress={onSend} />
-            <Button title="swap" onPress={onSwap} />
-            <Button title="buy" onPress={onBuy} />
+        <View style={styles.container}>
+            <Text style={styles.balance}>${balance}</Text>
+
+            <View style={styles.actions}>
+                <ActionBtn icon="add-outline"             label="Receive" onPress={onReceive} />
+                <ActionBtn icon="arrow-up-outline"        label="Send"    onPress={onSend} />
+                <ActionBtn icon="swap-horizontal-outline" label="Swap"    onPress={onSwap} />
+                <ActionBtn icon="card-outline"            label="Buy"     onPress={onBuy} />
+            </View>
         </View>
-    )
+    );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 28,
+        backgroundColor: "#2E2D2D",
+        alignItems: "center",
+    },
+    balance: {
+        color: "#fff",
+        fontSize: 64,
+        fontWeight: "900",
+        letterSpacing: -2,
+        marginBottom: 32,
+    },
+    actions: {
+        flexDirection: "row",
+        justifyContent: "space-evenly",
+        width: "100%",
+    },
+    actionBtn: {
+        width: 78,
+        height: 54,
+        borderRadius: 14,
+        borderWidth: 2,
+        borderColor: "#666",
+        backgroundColor: "#3D3C3C",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 4,
+    },
+    actionLabel: {
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: "700",
+    },
+});

@@ -1,4 +1,6 @@
-import { View, Text, TouchableOpacity, Image } from "react-native"
+import { Image, Text, TouchableOpacity, View } from "react-native";
+import { useAppTheme } from "../../context/ThemeContext";
+import { getColors } from "../../shared/theme";
 
 export function ChatHeader({
     groupName,
@@ -6,6 +8,8 @@ export function ChatHeader({
     onBack,
     onOpenControl
 }: any) {
+    const C = getColors(useAppTheme().theme);
+
     return (
         <View style={{
             flexDirection: "row",
@@ -15,11 +19,11 @@ export function ChatHeader({
             paddingBottom: 12,
             borderBottomWidth: 0.5,
             borderBottomColor: "#ddd",
-            backgroundColor: "white", 
+            backgroundColor: C.headerBg,
         }}
         >
             <TouchableOpacity onPress={onBack}>
-                <Text style={{ fontSize: 18 }}>🔙</Text>
+                <Text style={{ fontSize: 18, color: C.text }}>🔙</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -27,11 +31,11 @@ export function ChatHeader({
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  marginLeft: 12,  
+                  marginLeft: 12,
                   flex: 1,
                 }}
             >
-                <Image 
+                <Image
                     source={groupImage}
                     style={{
                         width: 36,
@@ -41,7 +45,7 @@ export function ChatHeader({
                     }}
                 />
 
-                <Text style={{ fontSize: 16, fontWeight: "bold" }}>
+                <Text style={{ fontSize: 16, fontWeight: "bold", color: C.text }}>
                     {groupName}
                 </Text>
             </TouchableOpacity>

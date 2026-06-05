@@ -1,4 +1,4 @@
-import { loginOrSignup, resetPassword, savePushToken } from "../mod/auth";
+import { loginOrSignup, resetPassword, savePushToken, getNonce } from "../mod/auth";
 import { AuthRequest } from "../mod/auth";
 import { Response, Request } from "express";
 
@@ -34,4 +34,8 @@ export async function resetPasswordRouter(req: Request, res: Response) {
 
 export async function savePushTokenRouter(req: AuthRequest, res: Response) {
     return savePushToken(req, res);
+}
+
+export function getNonceRouter(req: Request, res: Response) {
+    return getNonce(req, res);
 }

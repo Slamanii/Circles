@@ -1,4 +1,42 @@
+import { Audio } from "expo-av"
+import { useRef, useState } from "react"
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native"
+import { useAppTheme } from "../../context/ThemeContext"
+import { getColors } from "../../shared/theme"
+
+function AudioBubble({ uri, isMine }: { uri: string; isMine: boolean }) {
+    const soundRef = useRef<Audio.Sound | null>(null);
+    const [playing, setPlaying] = useState(false);
+
+    const toggle = async () => {
+        if (playing) {
+            await soundRef.current?.pauseAsync();
+            setPlaying(false);
+        } else {
+            if (!soundRef.current) {
+                const { sound } = await Audio.Sound.createAsync({ uri });
+                soundRef.current = sound;
+                sound.setOnPlaybackStatusUpdate((s) => {
+                    if (s.isLoaded && s.didJustFinish) {
+                        setPlaying(false);
+                        soundRef.current = null;
+                    }
+                });
+            }
+            await soundRef.current.playAsync();
+            setPlaying(true);
+        }
+    };
+
+    return (
+        <TouchableOpacity onPress={toggle} style={styles.audioBubble}>
+            <Text style={[styles.audioIcon, isMine && { color: "#fff" }]}>
+                {playing ? "⏸" : "▶"}
+            </Text>
+            <View style={[styles.audioWave, isMine ? styles.audioWaveMine : styles.audioWaveOther]} />
+        </TouchableOpacity>
+    );
+}
 
 type Props = {
     message: {
@@ -6,13 +44,13 @@ type Props = {
         senderId: string;
         senderName: string;
         content: string;
-        type: "text" | "image" | "video" | "system";
+        type: "text" | "image" | "video" | "audio" | "system";
         time: string;
         isMine: boolean;
         isPinned?: boolean;
         deleted?: boolean;
         status?: "sending" | "sent" | "delivered" | "read";
-        media?: { uri: string; thumbnail?: string };
+        media?: { uri: string; thumbnail?: string; duration?: number };
     };
     onDelete: () => void;
     onShare: () => void;
@@ -27,19 +65,23 @@ const STATUS_ICON: Record<string, string> = {
 };
 
 export function MessageBubble({ message, onDelete, onShare, onPin }: Props) {
+    const C = getColors(useAppTheme().theme);
 
     const { isMine, type, deleted, isPinned, status } = message;
 
     // system messages — centered, no bubble
     if (type === "system") {
         return (
-            <Text style={styles.system}>{message.content}</Text>
+            <Text style={[styles.system, { color: C.textSecondary }]}>{message.content}</Text>
         );
     }
 
     return (
         <View style={[styles.row, isMine ? styles.rowMine : styles.rowOther]}>
-            <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleOther]}>
+            <View style={[
+                styles.bubble,
+                isMine ? styles.bubbleMine : [styles.bubbleOther, { backgroundColor: C.surface }],
+            ]}>
 
                 {/* sender name — only for other people's messages */}
                 {!isMine && (
@@ -53,9 +95,9 @@ export function MessageBubble({ message, onDelete, onShare, onPin }: Props) {
 
                 {/* content */}
                 {deleted ? (
-                    <Text style={styles.deleted}>This message was deleted</Text>
+                    <Text style={[styles.deleted, { color: C.textMuted }]}>This message was deleted</Text>
                 ) : type === "text" ? (
-                    <Text style={isMine ? styles.textMine : styles.textOther}>
+                    <Text style={isMine ? styles.textMine : [styles.textOther, { color: C.text }]}>
                         {message.content}
                     </Text>
                 ) : type === "image" ? (
@@ -71,6 +113,8 @@ export function MessageBubble({ message, onDelete, onShare, onPin }: Props) {
                         />
                         <Text style={styles.videoIcon}>▶</Text>
                     </View>
+                ) : type === "audio" ? (
+                    <AudioBubble uri={message.media?.uri ?? message.content} isMine={isMine} />
                 ) : null}
 
                 {/* time + status row */}
@@ -214,4 +258,22 @@ const styles = StyleSheet.create({
         marginVertical: 8,
         fontStyle: "italic",
     },
+    audioBubble: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        paddingVertical: 4,
+        minWidth: 140,
+    },
+    audioIcon: {
+        fontSize: 20,
+        color: "#94A3B8",
+    },
+    audioWave: {
+        flex: 1,
+        height: 3,
+        borderRadius: 2,
+    },
+    audioWaveMine: { backgroundColor: "rgba(255,255,255,0.5)" },
+    audioWaveOther: { backgroundColor: "#475569" },
 });

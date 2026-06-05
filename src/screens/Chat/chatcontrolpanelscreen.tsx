@@ -31,7 +31,7 @@ export function useChatListLogic() {
     };
 
     const onGroupPress = (group: any) => {
-        navigation.navigate("ChatRoom", { group });
+        navigation.navigate("ChatScreen", { group });
     };
 
     return {
@@ -42,5 +42,6 @@ export function useChatListLogic() {
         onFilterChange: handleFilterChange,
         onToggleSelection: toggleSelection,
         onGroupPress,
+        onBack: () => navigation.goBack(),
     };
 }

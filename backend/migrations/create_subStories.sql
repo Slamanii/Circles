@@ -1,31 +1,26 @@
-create table storyItems (
-    id uuid priamary key default gen_random_uuid(),
-    story_id uuid references stories(id), 
-    duration integer not null default 15,
-    mediaUrl text not null,
-    media_type text not null
-        checks (media_type("image", "video")),
-    position integer not null,
-    caption text,
-    created_at (timestamp),
-)
+CREATE TABLE storyItems (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    story_id UUID REFERENCES stories(id) ON DELETE CASCADE,
+    duration INTEGER NOT NULL DEFAULT 15,
+    media_url TEXT NOT NULL,
+    media_type TEXT NOT NULL CHECK (media_type IN ('image', 'video')),
+    position INTEGER NOT NULL,
+    caption TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
 
-create table storyViews (
-    id uuid priamary key default gen_random_uuid(),
-    story_item_id uuid references storyItems(id),
-    viewer_id uuid references users(id),
-    add constraint unique_view,
-    unique (story_item_id, viewer_id),
-    views_count integer default 0,
-    viewed_at (timestamp),
-)
+CREATE TABLE storyViews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    story_item_id UUID REFERENCES storyItems(id) ON DELETE CASCADE,
+    viewer_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    viewed_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (story_item_id, viewer_id)
+);
 
-create table storyLikes (
-    id uuid priamary key default gen_random_uuid(),
-    story_item_id uuid references storyItems(id),
-    user_id uuid references users(id),
-    likes_count integer default 0,
-    created_at (timestamp),
-)
-
-
+CREATE TABLE storyLikes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    story_item_id UUID REFERENCES storyItems(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (story_item_id, user_id)
+);

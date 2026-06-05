@@ -1,6 +1,6 @@
 import { createTransferInstruction, getAssociatedTokenAddress, } from "@solana/spl-token";
 import { Connection, PublicKey, Transaction } from "@solana/web3.js";
-import { supabase } from "../../backend/src/services/supabase";
+import { supabase } from "./supabase";
 import { TicketMint } from "../../shared/Types"
 
 

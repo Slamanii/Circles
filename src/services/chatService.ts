@@ -78,11 +78,16 @@ export async function deleteMessage(messageId: string, deleteFor: "me" | "everyo
     return await res.json();
 }
 
-export async function sendMessage(groupId: string, content: string) {
+export async function sendMessage(
+    groupId: string,
+    content: string,
+    type: "text" | "image" | "video" | "audio" = "text",
+    media?: { uri: string; thumbnail?: string; duration?: number },
+) {
     const res = await fetch(`${API_URL}/api/send-message`, {
         method: "POST",
         headers: await authHeaders(),
-        body: JSON.stringify({ groupId, content }),
+        body: JSON.stringify({ groupId, content, type, media }),
     });
     if (!res.ok) throw new Error("Failed to send message");
     return await res.json();

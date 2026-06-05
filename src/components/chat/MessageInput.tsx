@@ -1,4 +1,6 @@
 import { View, Text, TouchableOpacity, TextInput } from "react-native"
+import { useAppTheme } from "../../context/ThemeContext"
+import { getColors } from "../../shared/theme"
 
 export function MessageInput({
     value,
@@ -7,7 +9,9 @@ export function MessageInput({
     onPickImage,
     onGif,
     onRecordAudio,
+    recording = false,
 }: any) {
+    const C = getColors(useAppTheme().theme);
 
     return (
         <View style={{
@@ -15,8 +19,8 @@ export function MessageInput({
             alignItems: "center",
             padding: 10,
             borderTopWidth: 0.5,
-            borderTopColor: "#ddd",
-            backgroundColor: "white",
+            borderTopColor: C.border,
+            backgroundColor: C.card,
         }}
         >
             <TouchableOpacity onPress={onGif}>
@@ -26,24 +30,26 @@ export function MessageInput({
                 <Text style={{ fontSize: 20, marginLeft: 10 }}>🖼️</Text>
             </TouchableOpacity>
 
-            <TextInput 
+            <TextInput
                 value={value}
                 onChangeText={onChange}
                 placeholder=""
+                placeholderTextColor={C.textMuted}
                 style={{
                     flex: 1,
-                    backgroundColor: "#f2f2f2",
+                    backgroundColor: C.surface,
                     marginHorizontal: 10,
                     paddingHorizontal: 12,
                     paddingVertical: 8,
                     borderRadius: 20,
+                    color: C.text,
                 }}
             />
             <TouchableOpacity onPress={onRecordAudio}>
-                <Text style={{ fontSize: 20 }}>🎙️</Text>
+                <Text style={{ fontSize: 20, opacity: recording ? 0.4 : 1 }}>🎙️</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={onSend}>
-                <Text style={{ fontSize: 18, marginLeft: 10 }}>Send</Text>
+                <Text style={{ fontSize: 18, marginLeft: 10, color: C.accent, fontWeight: "600" }}>Send</Text>
             </TouchableOpacity>
         </View>
     );

@@ -10,23 +10,24 @@ export default function useCollectiblesLogic() {
     const [query, setQuery] = useState("");
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        async function load() {
-            try {
-                const [data, stored] = await Promise.all([
-                    fetchCollectibles(),
-                    AsyncStorage.getItem("pinnedTickets"),
-                ]);
-                setCollectibles(data);
-                if (stored) setPinnedIds(new Set(JSON.parse(stored)));
-            } catch (err) {
-                console.error("Failed to load collectibles", err);
-            } finally {
-                setLoading(false);
-            }
+    async function load() {
+        try {
+            const [data, stored] = await Promise.all([
+                fetchCollectibles(),
+                AsyncStorage.getItem("pinnedTickets"),
+            ]);
+            setCollectibles(data);
+            if (stored) setPinnedIds(new Set(JSON.parse(stored)));
+        } catch (err) {
+            console.error("Failed to load collectibles", err);
+        } finally {
+            setLoading(false);
         }
-        load();
-    }, []);
+    }
+
+    useEffect(() => { load(); }, []);
+
+    const reload = async () => { await load(); };
 
     useEffect(() => {
         AsyncStorage.setItem("pinnedTickets", JSON.stringify(Array.from(pinnedIds)));
@@ -70,5 +71,6 @@ export default function useCollectiblesLogic() {
         setQuery,
         results,
         isPinned,
+        reload,
     };
 }

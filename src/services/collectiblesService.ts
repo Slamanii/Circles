@@ -19,6 +19,7 @@ export type Collectible = {
     owner_id: string;
     custodian: "treasury" | "user";
     status: "pending" | "active" | "expired";
+    serial_number: number | null;
     qr_uri: string;
     events: {
         title: string;

@@ -1,22 +1,45 @@
-import { FlatList, Text, TouchableOpacity } from "react-native";
-
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { WalletTokenRow } from "../../../components/wallet/WalletTokenRow";
+import { Token } from "../../../../shared/Types";
 
 export default function BuyScreen({ navigation, route }: any) {
-  const { tokens } = route.params;
+    const tokens: Token[] = route.params?.tokens ?? [];
 
-  return (
-    <FlatList
-      data={tokens}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <TouchableOpacity
-          onPress={() =>
-            navigation.navigate("BuyForm", { token: item })
-          }
-        >
-          <Text>{item.name}</Text>
-        </TouchableOpacity>
-      )}
-    />
-  );
+    return (
+        <View style={styles.container}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                <Text style={styles.backText}>←</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.title}>Buy</Text>
+
+            <FlatList
+                data={tokens}
+                keyExtractor={t => t.id}
+                contentContainerStyle={styles.list}
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item }) => (
+                    <WalletTokenRow
+                        token={item}
+                        onPress={() => navigation.navigate("BuyForm", {
+                            token: item,
+                            walletAddress: route.params?.walletAddress ?? "",
+                        })}
+                    />
+                )}
+                ListEmptyComponent={
+                    <Text style={styles.empty}>No tokens available</Text>
+                }
+            />
+        </View>
+    );
 }
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: "#2E2D2D" },
+    backBtn:   { marginTop: 56, marginLeft: 20, marginBottom: 8 },
+    backText:  { color: "#fff", fontSize: 22 },
+    title:     { color: "#fff", fontSize: 22, fontWeight: "700", marginLeft: 20, marginBottom: 20 },
+    list:      { paddingHorizontal: 16, paddingBottom: 40 },
+    empty:     { color: "#6B7280", textAlign: "center", marginTop: 60, fontSize: 14 },
+});

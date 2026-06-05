@@ -1,66 +1,81 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useAppTheme } from "../../context/ThemeContext";
+import { getColors } from "../../shared/theme";
 import { ChatListHeaderProps } from "../../../shared/Types";
 
-export function ChatListHeader({ 
-    username, 
-    onBack, 
-    onToggleSelection, 
-    archiveFilter, 
-    onFilterChange 
+export function ChatListHeader({
+    username,
+    onBack,
+    onToggleSelection,
+    archiveFilter,
+    onFilterChange
 }: ChatListHeaderProps) {
+    const C = getColors(useAppTheme().theme);
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor: C.headerBg }]}>
 
             <View style={styles.topRow}>
 
                 <TouchableOpacity onPress={onBack} style={styles.iconButton}>
-                    <Ionicons name="arrow-back" size={22} />
+                    <Ionicons name="arrow-back" size={22} color={C.text} />
                 </TouchableOpacity>
 
-                <Text style={styles.username}>
-                        {username}
+                <Text style={[styles.username, { color: C.text }]}>
+                    {username}
                 </Text>
 
                 <TouchableOpacity onPress={onToggleSelection} style={styles.iconButton}>
-                    <Ionicons name="options-outline" size={22} />
+                    <Ionicons name="options-outline" size={22} color={C.text} />
                 </TouchableOpacity>
             </View>
 
             <View style={styles.filterRow}>
-                    <FilterButton 
+                    <FilterButton
                         label="All"
                         active={archiveFilter === "all"}
                         onPress={() => onFilterChange("all")}
+                        colors={C}
                     />
-                    <FilterButton 
+                    <FilterButton
                         label="Archive"
                         active={archiveFilter === "archived"}
                         onPress={() => onFilterChange("archived")}
+                        colors={C}
                     />
-                    <FilterButton 
+                    <FilterButton
                         label="Deleted"
                         active={archiveFilter === "deleted"}
                         onPress={() => onFilterChange("deleted")}
+                        colors={C}
                     />
-                    <FilterButton 
+                    <FilterButton
                         label="Pending"
                         active={archiveFilter === "pending"}
                         onPress={() => onFilterChange("pending")}
+                        colors={C}
                     />
             </View>
         </View>
     );    
 }
 
-export function FilterButton({ label, active, onPress }: any) {
+export function FilterButton({ label, active, onPress, colors }: any) {
     return (
         <TouchableOpacity
             onPress={onPress}
-            style={[styles.filterButton, active && styles.activeFilter]}
+            style={[
+                styles.filterButton,
+                { backgroundColor: colors?.surface ?? "#EAEAEA" },
+                active && styles.activeFilter,
+            ]}
         >
-            <Text style={[styles.filterText, active && styles.activeFilterText]}>
+            <Text style={[
+                styles.filterText,
+                { color: colors?.text ?? "black" },
+                active && styles.activeFilterText,
+            ]}>
                 {label}
             </Text>
         </TouchableOpacity>
@@ -72,7 +87,7 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 16,
     paddingBottom: 10,
-    backgroundColor: "white",
+    backgroundColor: "#D9D9D9",
   },
 
   topRow: {

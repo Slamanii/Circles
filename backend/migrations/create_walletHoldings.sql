@@ -11,7 +11,7 @@ create table walletHoldings (
     mint_address text not null,
     ata_address text not null,
     token_type text not null
-        check (token_type in ("solana", "usdt", "ethereum", "afrik")),
+        check (token_type in ('solana', 'usdt', 'ethereum', 'cngn')),
     balance numeric(38, 18)  not null 
         check (balance >= 0),
 )

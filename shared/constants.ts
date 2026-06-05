@@ -1,4 +1,8 @@
-import type { EventCard, EventDetails, Group, Message, Story, TicketMint } from "./Types";
+import type { EventCard, EventDetails, Group, Message, Story } from "./Types";
+
+// Mock image assets — resolved at runtime only in the frontend bundle.
+// Backend imports of this file must never reference these.
+const _img = (path: string) => ({ uri: path });
 
 export const STORIES: Story[] = [
     {
@@ -95,38 +99,6 @@ export const EVENTDETAILS: EventDetails[] = [
   },
 ]
 
-export const MINT: TicketMint[] = [
-  {
-    ticketId: "f1",
-    mintImage: "https//i.pravatar.cc/150?img=5",
-    address: "dghsb35892hbber2679j2bc268wnbwhgsf",
-    description: "let him cook",
-    ticketName: "Back Off",
-    serialNumber: 1,
-    venue: "Osapa",
-    date: "12th, October, 2022",
-    time: "2:00pm", 
-    price: 25000,
-    active: true,
-    status: "inActive",
-    qrUri: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=TKT_001",
-  },
-  {
-    ticketId: "f2",
-    mintImage: "https//i.pravatar.cc/150?img=6",
-    address: "dghsb3592hber2679j2bc268wnbwhgsf33",
-    description: "let him cook",
-    ticketName: "Back Off 2",
-    serialNumber: 2,
-    venue: "Osapa",
-    date: "1st, March, 2025",
-    time: "2:00pm", 
-    price: 20000,
-    active: false,
-    status: "active",
-    qrUri: "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=TKT_001",
-  }
-]
 
 export const GROUPS: Group[] = [
   {
@@ -134,7 +106,7 @@ export const GROUPS: Group[] = [
     groupName: "Fuego Concert 🔥",
     lastMessage: "fuck Jason",
     time: 2.30,
-    groupImage: require("../../assets/groups/concert.png"),
+    groupImage: _img("concert"),
     pinned: false,
     muted: true,
     createdBy: "u1",
@@ -151,7 +123,7 @@ export const GROUPS: Group[] = [
     groupName: "Weekend Vibes",
     lastMessage: "fuck Jason",
     time: 2.30,
-    groupImage: require("../../assets/groups/vibes.png"),
+    groupImage: _img("vibes"),
     pinned: false,
     muted: true,
     createdBy: "u2",
@@ -167,7 +139,7 @@ export const GROUPS: Group[] = [
     groupName: "Design Team",
     lastMessage: "fuck Jason",
     time: 2.30,
-    groupImage: require("../../assets/groups/design.png"),
+    groupImage: _img("design"),
     pinned: false,
     muted: true,
     createdBy: "u3",
@@ -286,24 +258,34 @@ export const MESSAGES: Record<string, Message[]> = {
 };
 
 export const TOKENS = {
-  solana: {
-    symbol: "SOL",
-    decimals: 9,
-    mint: null // native token
-  },
+    solana: {
+        name: "Solana",
+        symbol: "SOL",
+        mint: "So11111111111111111111111111111111111111112",
+        decimals: 9,
+        logoUri: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png",
+    },
+    usdt: {
+        name: "Tether USD",
+        symbol: "USDT",
+        mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+        decimals: 6,
+        logoUri: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB/logo.svg",
+    },
+    ethereum: {
+        name: "Ethereum",
+        symbol: "ETH",
+        mint: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs",
+        decimals: 8,
+        logoUri: "https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs/logo.png",
+    },
+    cngn: {
+        name: "Compliant Naira",
+        symbol: "cNGN",
+        mint: "3jiqwBQVRC5zRwHyqvnkQurebJ5RNxg3F5fXMwaxgkv8",
+        decimals: 6,
+        logoUri: "https://assets.coingecko.com/coins/images/38174/small/cNGN.jpg",
+    },
+} as const;
 
-  usdt: {
-    symbol: "USDT",
-    mint: "Es9vMFrzaCER..."
-  },
-
-  ethereum: {
-    symbol: "ETH",
-    mint: "So11111111111111111111111111111111111111112"
-  },
-
-  afrik: {
-    symbol: "AFRIK",
-    mint: "9xYh3..."
-  }
-};
+export type TokenKey = keyof typeof TOKENS;

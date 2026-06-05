@@ -6,12 +6,11 @@ export async function createStory({
 }: {
     userId: string;
     mediaFiles: {
-        file: File;
+        mediaUrl: string;
         caption?: string;
         type: "image" | "video";
     }[];
 }) {
-
     const { data: story, error: storyError } = await supabase
         .from("stories")
         .insert({
@@ -21,52 +20,26 @@ export async function createStory({
         .select()
         .single();
 
-        if (storyError) throw storyError;
+    if (storyError) throw storyError;
 
-    const uploadedItems = [];
+    const items = mediaFiles.map((file, i) => ({
+        story_id: story.id,
+        media_url: file.mediaUrl,
+        caption: file.caption ?? null,
+        media_type: file.type,
+        position: i + 1,
+    }));
 
-    for (let i = 0; i < mediaFiles.length; i++) {
-        const file = mediaFiles[i];
+    const { error: itemsError } = await supabase.from("storyitems").insert(items);
+    if (itemsError) throw itemsError;
 
-        const filePath = `${userId}/${Date.now()}-${i}`;
+    await supabase
+        .from("stories")
+        .update({ preview_media_snapshot: items[items.length - 1].media_url })
+        .eq("id", story.id);
 
-        const { data: uploadData, error: uploadError } =
-            await supabase.storage
-                .from("stories")
-                .upload(filePath, file.file);
-
-            if (uploadError) throw uploadError;
-
-            const { data: publicUrl } = supabase
-                .storage
-                .from("stories")
-                .getPublicUrl(filePath);
-
-            uploadedItems.push({
-                story_id: story.id,
-                media_url: publicUrl.publicUrl,
-                caption: file.caption ?? null,
-                media_type: file.type,
-                position: i + 1,
-            });
-
-        }
-
-        const { error: itemsError } = await supabase
-                .from("storyitems")
-                .insert(uploadedItems);
-
-            if (itemsError) throw itemsError;
-
-            const lastItem = uploadedItems[uploadedItems.length - 1];
-                
-            await supabase
-                .from("stories")
-                .update({ preview_media_snapshot: lastItem.media_url })
-                .eq("id", story.id);
-
-                return story;
-    }
+    return story;
+}
 
 export async function viewStory({
     storyItemId,
@@ -205,7 +178,7 @@ export async function fetchStories(userId: string) {
       id,
       user_id,
       created_at,
-      profiles (username, avatar_url),
+      users (username, avatar),
       storyItems (
         id,
         media_url,
@@ -240,7 +213,7 @@ export async function fetchStoriesPreview(userId: string) {
     .select(`
       id,
       user_id,
-      profiles (username, avatar_url),
+      users (username, avatar),
       storyItems (
         id,
         media_url,
@@ -254,6 +227,28 @@ export async function fetchStoriesPreview(userId: string) {
   if (error) throw error;
 
   return data;
+}
+
+export async function fetchDiscoverStories(currentUserId: string, limit: number = 400) {
+    const { data, error } = await supabase
+        .from("stories")
+        .select(`
+            id,
+            user_id,
+            preview_media_snapshot,
+            users (username, avatar),
+            story_items (
+                id,
+                media_url,
+                created_at
+            )
+        `)
+        .neq("user_id", currentUserId)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+    if (error) throw error;
+    return data;
 }
 
 export async function fetchStoryByUser(userId: string) {

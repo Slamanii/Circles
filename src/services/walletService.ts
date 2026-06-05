@@ -10,32 +10,46 @@ async function authHeaders() {
     };
 }
 
-export async function InitiateWalletTransaction(eventId: string) {
-    try {
-        const res = await fetch(`${API_URL}/api/initiate-wallet-tx`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify({ eventId }),
-        });
-        if (!res.ok) throw new Error("Failed to initiate wallet transaction");
-        return await res.json();
-    } catch (err) {
-        console.error("InitiateWalletTransaction error:", err);
-    }
+export async function getPaymentOptions(eventId: string, quantity: number) {
+    const res = await fetch(`${API_URL}/api/payment-options`, {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ eventId, quantity }),
+    });
+    if (!res.ok) throw new Error("Failed to fetch payment options");
+    return await res.json() as {
+        options: { key: string; symbol: string; mint: string; decimals: number; amount: number; rawAmount: number }[];
+        event: { ticket_price: number; title: string };
+        quantity: number;
+    };
 }
 
-export async function initiatePaystackPay(eventId: string) {
+export async function confirmWalletPurchase(
+    eventId: string,
+    txSignature: string,
+    tokenMint: string,
+    quantity: number,
+) {
+    const res = await fetch(`${API_URL}/api/confirm-wallet-purchase`, {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ eventId, txSignature, tokenMint, quantity }),
+    });
+    if (!res.ok) throw new Error("Failed to confirm wallet purchase");
+    return await res.json() as { success: boolean; ticketsClaimed: number };
+}
 
+export async function initiatePaystackPay(eventId: string, quantity: number) {
     try {
         const res = await fetch(`${API_URL}/api/initiate-paystack`, {
             method: "POST",
             headers: await authHeaders(),
-            body: JSON.stringify({ eventId }),
+            body: JSON.stringify({ eventId, quantity }),
         });
-        if (!res.ok) throw new Error("Failed to initaite paystack transaction");
-        return await res.json();
+        if (!res.ok) throw new Error("Failed to initiate paystack transaction");
+        return await res.json() as { checkoutUrl: string; reference: string; quantity: number };
     } catch (err) {
-        console.error("InitaiatePaystackPay error:", err);
+        console.error("initiatePaystackPay error:", err);
     }
 }
 

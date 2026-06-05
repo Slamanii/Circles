@@ -6,7 +6,7 @@ import { fetchSolBalances } from "../services/wallet/balance";
 export function useWalletLogic(walletAddress: string) {
     const navigation = useNavigation<any>();
     const [username, setUsername] = useState("");
-    const [balance, setBalance] = useState<{ sol: number; tokens: any[] } | null>(null);
+    const [balance, setBalance] = useState<{ sol: number; tokens: any[]; totalUSD: number } | null>(null);
 
     useEffect(() => {
         async function load() {

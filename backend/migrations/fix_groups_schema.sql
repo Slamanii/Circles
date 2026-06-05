@@ -1,0 +1,3 @@
+-- groups table already has correct snake_case columns:
+-- name, group_image, created_by, is_event_group, is_locked, created_at, event_id
+-- No migration needed.

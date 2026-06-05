@@ -1,8 +1,8 @@
 import { createStory, viewStory, unlikeStory, likeStory, deleteSubStory, deleteStory, fetchStories,
-         fetchStoriesPreview, fetchStoryByUser, fetchStoryViews, fetchStoryLikes } 
+         fetchStoriesPreview, fetchStoryByUser, fetchStoryViews, fetchStoryLikes, fetchDiscoverStories }
     from "../mod/stories"
 
-export async function createStoryRouter({req, res}: any) {
+export async function createStoryRouter(req: any, res: any) {
 
     try {     
      
@@ -18,7 +18,7 @@ export async function createStoryRouter({req, res}: any) {
     }
 }
 
-export async function viewStoryRouter({req, res}: any) {
+export async function viewStoryRouter(req: any, res: any) {
 
     try {     
      
@@ -34,7 +34,7 @@ export async function viewStoryRouter({req, res}: any) {
     }
 }
 
-export async function unlikeStoryRouter({req, res}: any) {
+export async function unlikeStoryRouter(req: any, res: any) {
 
     try {     
      
@@ -50,7 +50,7 @@ export async function unlikeStoryRouter({req, res}: any) {
     }
 }
 
-export async function likeStoryRouter({req, res}: any) {
+export async function likeStoryRouter(req: any, res: any) {
 
     try {     
      
@@ -66,7 +66,7 @@ export async function likeStoryRouter({req, res}: any) {
     }
 }
 
-export async function deleteSubStoryRouter({req, res}: any) {
+export async function deleteSubStoryRouter(req: any, res: any) {
 
     try {     
      
@@ -82,7 +82,7 @@ export async function deleteSubStoryRouter({req, res}: any) {
     }
 }
 
-export async function deleteStoryRouter({req, res}: any) {
+export async function deleteStoryRouter(req: any, res: any) {
 
     try {     
      
@@ -98,7 +98,7 @@ export async function deleteStoryRouter({req, res}: any) {
     }
 }
 
-export async function fetchStoriesRouter({req, res}: any) {
+export async function fetchStoriesRouter(req: any, res: any) {
 
     try {     
     const userId = req.user.id;
@@ -113,7 +113,7 @@ export async function fetchStoriesRouter({req, res}: any) {
 }
 
 
-export async function fetchStoriesPreviewRouter({req, res}: any) {
+export async function fetchStoriesPreviewRouter(req: any, res: any) {
 
     try {     
     const userId = req.user.id;
@@ -127,7 +127,7 @@ export async function fetchStoriesPreviewRouter({req, res}: any) {
     }
 }
 
-export async function fetchStoryByUserRouter({req, res}: any) {
+export async function fetchStoryByUserRouter(req: any, res: any) {
 
     try {     
 
@@ -139,6 +139,17 @@ export async function fetchStoryByUserRouter({req, res}: any) {
     } catch (error) {
         console.error(error)
         res.status(500).json({error: "Failed to fetch story by user"})
+    }
+}
+
+export async function fetchDiscoverStoriesRouter(req: any, res: any) {
+    try {
+        const userId = req.user.id;
+        const result = await fetchDiscoverStories(userId, 400);
+        res.status(200).json(result);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to fetch discover stories" });
     }
 }
 

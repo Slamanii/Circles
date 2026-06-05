@@ -1,145 +1,130 @@
-import React from 'react'
-import { View, Text, Modal, TouchableOpacity, StyleSheet, Switch } from "react-native"
+import React from 'react';
+import { Modal, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { useAppTheme } from "../../context/ThemeContext";
+import { getColors } from "../../shared/theme";
+
+function dividerColor(theme: string) {
+    return theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.12)";
+}
+
+function SettingsRow({ label, onPress, isLast, theme, C, right }: any) {
+    return (
+        <View>
+            <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={onPress ? 0.6 : 1}>
+                <Text style={[styles.rowText, { color: C.text }]}>{label}</Text>
+                {right}
+            </TouchableOpacity>
+            {!isLast && <View style={[styles.divider, { backgroundColor: dividerColor(theme) }]} />}
+        </View>
+    );
+}
 
 export function SettingsModal({
-        visible,
-        username,
-        closeSettings,
-        toggleTheme,
-        theme,
-        goToInactiveScreens,
-        logout,
-        unfollow,
- }: any) {
-
+    visible,
+    closeSettings,
+    toggleTheme,
+    theme,
+    goToInactiveScreens,
+    logout,
+}: any) {
+    const { theme: appTheme } = useAppTheme();
+    const C = getColors(appTheme);
 
     return (
         <Modal
             visible={visible}
             transparent
             animationType="slide"
+            onRequestClose={closeSettings}
         >
+            <View style={styles.root}>
+                <TouchableOpacity style={styles.overlay} onPress={closeSettings} activeOpacity={1} />
 
-            <TouchableOpacity style={styles.overlay} onPress={closeSettings} />
+                <View style={[styles.sheet, { backgroundColor: C.background }]}>
+                    <View style={styles.handle} />
 
-            <View style={styles.container}>
-                <View style={styles.handle}>
+                    <Text style={[styles.title, { color: C.text }]}>Profile Settings</Text>
 
-                    <Text style={styles.title}>{username}</Text>
-
-                    <View style={styles.row}>
-                        <Text style={styles.text}>
-                            Dark Mode
-                        </Text>
-                        <Switch 
-                            value={theme === "dark"}
-                            onValueChange={toggleTheme}
+                    {/* Card 1 — features */}
+                    <View style={[styles.card, { backgroundColor: C.card }]}>
+                        <SettingsRow label="QR"              onPress={() => goToInactiveScreens("QR")}      theme={appTheme} C={C} />
+                        <SettingsRow label="Upgrade Account" onPress={() => goToInactiveScreens("upgrade")} theme={appTheme} C={C} />
+                        <SettingsRow label="Privacy"         onPress={() => goToInactiveScreens("privacy")} theme={appTheme} C={C} />
+                        <SettingsRow
+                            label="Color Mode"
+                            theme={appTheme}
+                            C={C}
+                            right={
+                                <Switch
+                                    value={theme === "dark"}
+                                    onValueChange={toggleTheme}
+                                    trackColor={{ true: "#E8622A" }}
+                                />
+                            }
                         />
+                        <SettingsRow label="Music" onPress={() => goToInactiveScreens("music")} theme={appTheme} C={C} isLast />
                     </View>
 
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={() => goToInactiveScreens("QR")}
-                    >
-                        <Text style={styles.text}>QR</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={() => goToInactiveScreens("privacy")}
-                    >
-                        <Text style={styles.text}>Privacy</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={() => goToInactiveScreens("music")}
-                    >
-                        <Text style={styles.text}>Music</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={() => goToInactiveScreens("add-account")}
-                    >
-                        <Text style={styles.text}>Add Account</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={() => goToInactiveScreens("support")}
-                    >
-                        <Text style={styles.text}>Support</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.button}
-                        onPress={() => unfollow}
-                    >
-                        <Text style={styles.text}>Unfollow</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                        style={styles.logout} onPress={logout}>
-                        <Text style={styles.text}>Logout</Text>
-                    </TouchableOpacity>
+                    {/* Card 2 — account */}
+                    <View style={[styles.card, { backgroundColor: C.card }]}>
+                        <SettingsRow label="Add Account"            onPress={() => goToInactiveScreens("add-account")} theme={appTheme} C={C} />
+                        <SettingsRow label="Security & permissions" onPress={() => goToInactiveScreens("support")}     theme={appTheme} C={C} />
+                        <SettingsRow
+                            label="Logout"
+                            onPress={logout}
+                            isLast
+                            theme={appTheme}
+                            C={C}
+                            right={null}
+                        />
+                    </View>
                 </View>
-
             </View>
         </Modal>
-    )
+    );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-  },
-  container: {
-    position: "absolute",
-    bottom: 0,
-    width: "100%",
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-  },
-  handle: {
-    width: 40,
-    height: 5,
-    backgroundColor: "#ccc",
-    alignSelf: "center",
-    borderRadius: 3,
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-  button: {
-    paddingVertical: 14,
-    borderBottomWidth: 0.5,
-    borderColor: "#ddd",
-  },
-  text: {
-    fontSize: 16,
-  },
-  logout: {
-    marginTop: 20,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  logoutText: {
-    color: "red",
-    fontSize: 16,
-    fontWeight: "600",
-  },
+    root: { flex: 1, justifyContent: "flex-end" },
+    overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
+    sheet: {
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        paddingHorizontal: 16,
+        paddingBottom: 40,
+        paddingTop: 12,
+    },
+    handle: {
+        width: 40,
+        height: 5,
+        backgroundColor: "#ccc",
+        alignSelf: "center",
+        borderRadius: 3,
+        marginBottom: 16,
+    },
+    title: {
+        fontSize: 18,
+        fontWeight: "700",
+        textAlign: "center",
+        marginBottom: 20,
+    },
+    card: {
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        marginBottom: 14,
+        overflow: "hidden",
+    },
+    row: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 16,
+    },
+    rowText: {
+        fontSize: 15,
+        fontWeight: "500",
+    },
+    divider: {
+        height: StyleSheet.hairlineWidth,
+    },
 });
