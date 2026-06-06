@@ -1,4 +1,4 @@
-import { createGroupChat, getGroup, sendMessage, removeMember, fetchMessages, leaveGroup, deleteGroup, makeAdmin, fetchUnreadNotifications, markNotificationsRead, fetchUserGroups, deleteMessage, pinMessage } from "../mod/chat";
+import { createGroupChat, getGroup, sendMessage, removeMember, fetchMessages, leaveGroup, deleteGroup, makeAdmin, fetchUnreadNotifications, markNotificationsRead, fetchUserGroups, deleteMessage, pinMessage, starMessage, unstarMessage, fetchStarredIds } from "../mod/chat";
 import { markAsRead, getUnreadCount } from "../services/chat.service"
 import { AuthRequest } from "../mod/auth"
 import { Response } from "express" 
@@ -26,6 +26,42 @@ export async function deleteMessageRouter(req: AuthRequest, res: Response) {
     } catch (error: any) {
         console.error(error);
         res.status(error.message.includes("Only the sender") ? 403 : 500).json({ error: error.message });
+    }
+}
+
+export async function starMessageRouter(req: AuthRequest, res: Response) {
+    try {
+        const userId = req.user!.id;
+        const { messageId } = req.body;
+        if (!messageId) return res.status(400).json({ error: "Missing messageId" });
+        const result = await starMessage(userId, messageId);
+        res.json(result);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+}
+
+export async function unstarMessageRouter(req: AuthRequest, res: Response) {
+    try {
+        const userId = req.user!.id;
+        const { messageId } = req.body;
+        if (!messageId) return res.status(400).json({ error: "Missing messageId" });
+        const result = await unstarMessage(userId, messageId);
+        res.json(result);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+}
+
+export async function fetchStarredIdsRouter(req: AuthRequest, res: Response) {
+    try {
+        const userId = req.user!.id;
+        const { groupId } = req.query as { groupId: string };
+        if (!groupId) return res.status(400).json({ error: "Missing groupId" });
+        const ids = await fetchStarredIds(userId, groupId);
+        res.json({ ids });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
     }
 }
 

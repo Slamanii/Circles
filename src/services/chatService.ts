@@ -83,12 +83,42 @@ export async function sendMessage(
     content: string,
     type: "text" | "image" | "video" | "audio" = "text",
     media?: { uri: string; thumbnail?: string; duration?: number },
+    replyTo?: string,
 ) {
     const res = await fetch(`${API_URL}/api/send-message`, {
         method: "POST",
         headers: await authHeaders(),
-        body: JSON.stringify({ groupId, content, type, media }),
+        body: JSON.stringify({ groupId, content, type, media, replyTo }),
     });
     if (!res.ok) throw new Error("Failed to send message");
     return await res.json();
+}
+
+export async function starMessage(messageId: string) {
+    const res = await fetch(`${API_URL}/api/star-message`, {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ messageId }),
+    });
+    if (!res.ok) throw new Error("Failed to star message");
+    return res.json();
+}
+
+export async function unstarMessage(messageId: string) {
+    const res = await fetch(`${API_URL}/api/unstar-message`, {
+        method: "POST",
+        headers: await authHeaders(),
+        body: JSON.stringify({ messageId }),
+    });
+    if (!res.ok) throw new Error("Failed to unstar message");
+    return res.json();
+}
+
+export async function fetchStarredIds(groupId: string): Promise<string[]> {
+    const res = await fetch(`${API_URL}/api/starred-messages?groupId=${groupId}`, {
+        headers: await authHeaders(),
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.ids ?? [];
 }

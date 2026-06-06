@@ -2,10 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { useEffect, useState } from "react";
-import { StyleSheet, Switch, Text, TouchableOpacity, View, ScrollView } from "react-native";
+import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View, ScrollView } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 import { updateProfile } from "../../services/user";
+import { deleteAccount } from "../../services/login";
 
 function dividerColor(theme: string) {
     return theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.12)";
@@ -56,6 +57,29 @@ export default function SettingsScreen() {
     const logout = async () => {
         await AsyncStorage.multiRemove(["token", "user", "active_wallet"]);
         navigation.replace("login" as never);
+    };
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            "Delete Account",
+            "Your account will be permanently deleted after 30 days. You can cancel by logging back in before then. Continue?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Request Deletion",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await deleteAccount();
+                            await AsyncStorage.multiRemove(["token", "user", "active_wallet"]);
+                            navigation.replace("login" as never);
+                        } catch (err: any) {
+                            Alert.alert("Error", err.message ?? "Please try again");
+                        }
+                    },
+                },
+            ],
+        );
     };
 
     return (
@@ -132,9 +156,15 @@ export default function SettingsScreen() {
                     <SettingsRow
                         label="Logout"
                         onPress={logout}
-                        isLast
                         theme={theme} C={C}
                         right={<Ionicons name="log-out-outline" size={18} color="#EF4444" />}
+                    />
+                    <SettingsRow
+                        label="Delete Account"
+                        onPress={handleDeleteAccount}
+                        isLast
+                        theme={theme} C={C}
+                        right={<Ionicons name="trash-outline" size={18} color="#EF4444" />}
                     />
                 </View>
             </ScrollView>

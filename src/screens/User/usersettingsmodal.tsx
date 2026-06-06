@@ -1,5 +1,6 @@
 import React from 'react';
-import { Modal, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Modal, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
+import { deleteAccount } from "../../services/login";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 
@@ -29,6 +30,29 @@ export function SettingsModal({
 }: any) {
     const { theme: appTheme } = useAppTheme();
     const C = getColors(appTheme);
+
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            "Delete Account",
+            "Your account will be permanently deleted after 30 days. You can cancel by logging back in before then. Continue?",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Request Deletion",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await deleteAccount();
+                            closeSettings();
+                            logout();
+                        } catch (err: any) {
+                            Alert.alert("Error", err.message ?? "Please try again");
+                        }
+                    },
+                },
+            ],
+        );
+    };
 
     return (
         <Modal
@@ -72,6 +96,13 @@ export function SettingsModal({
                         <SettingsRow
                             label="Logout"
                             onPress={logout}
+                            theme={appTheme}
+                            C={C}
+                            right={null}
+                        />
+                        <SettingsRow
+                            label="Delete Account"
+                            onPress={handleDeleteAccount}
                             isLast
                             theme={appTheme}
                             C={C}

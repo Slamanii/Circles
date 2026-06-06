@@ -48,7 +48,9 @@ export async function getGroup(groupId: string, userId: string) {
                 content,
                 type,
                 sender_id,
-                created_at
+                created_at,
+                media,
+                reply_to
             )
             `)
             .eq("id", groupId)
@@ -77,12 +79,14 @@ export async function sendMessage({
     content,
     type = "text",
     media,
+    replyTo,
 }: {
     groupId: string;
     userId: string;
     content: string;
     type?: "text" | "image" | "video" | "audio";
     media?: { uri: string; thumbnail?: string; duration?: number };
+    replyTo?: string;
 }) {
     const { data: member } = await supabase
         .from("group_members")
@@ -108,23 +112,75 @@ export async function sendMessage({
             content,
             type,
             media: media ?? null,
+            reply_to: replyTo ?? null,
             status: "sent",
         })
         .select()
         .single();
 
-        if (error) throw error;
+    if (error) throw error;
 
-        await supabase.from("notifications").insert({
-            user_id: userId,
-            type: "chat",
-            title: "New Message",
-            message: "You received a new group message",
-            reference_id: groupId,
-            reference_type: "group"
+    // notify group members
+    await supabase.from("notifications").insert({
+        user_id: userId,
+        type: "chat",
+        title: "New Message",
+        message: "You received a new group message",
+        reference_id: groupId,
+        reference_type: "group",
+    });
+
+    // notify @mentioned users
+    const mentionMatches = content.match(/@(\w+)/g) ?? [];
+    for (const mention of mentionMatches) {
+        const username = mention.slice(1);
+        const { data: mentioned } = await supabase
+            .from("users")
+            .select("id")
+            .eq("username", username)
+            .single();
+        if (mentioned && mentioned.id !== userId) {
+            await supabase.from("notifications").insert({
+                user_id: mentioned.id,
+                type: "mention",
+                title: `${user?.username ?? "Someone"} mentioned you`,
+                message: content,
+                reference_id: groupId,
+                reference_type: "group",
             });
+        }
+    }
 
-        return message;
+    return message;
+}
+
+export async function starMessage(userId: string, messageId: string) {
+    const { data, error } = await supabase
+        .from("starred_messages")
+        .upsert({ user_id: userId, message_id: messageId }, { onConflict: "user_id,message_id" })
+        .select()
+        .single();
+    if (error) throw error;
+    return { starred: true, id: data.id };
+}
+
+export async function unstarMessage(userId: string, messageId: string) {
+    const { error } = await supabase
+        .from("starred_messages")
+        .delete()
+        .eq("user_id", userId)
+        .eq("message_id", messageId);
+    if (error) throw error;
+    return { starred: false };
+}
+
+export async function fetchStarredIds(userId: string, groupId: string) {
+    const { data } = await supabase
+        .from("starred_messages")
+        .select("message_id, messages!inner(group_id)")
+        .eq("user_id", userId)
+        .eq("messages.group_id", groupId);
+    return (data ?? []).map((r: any) => r.message_id as string);
 }
 
 

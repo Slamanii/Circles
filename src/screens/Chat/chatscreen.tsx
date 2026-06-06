@@ -9,7 +9,7 @@ import { Message } from "../../../shared/Types";
 import { ChatHeader } from "../../components/chat/ChatHeader";
 import { MessageInput } from "../../components/chat/MessageInput";
 import { MessageList } from "../../components/chat/MessageList";
-import { fetchMessages, sendMessage, deleteMessage, pinMessage } from "../../services/chatService";
+import { fetchMessages, sendMessage, deleteMessage, pinMessage, starMessage, unstarMessage, fetchStarredIds } from "../../services/chatService";
 import { subscribeToNotifications } from "../../services/notifications";
 import { uploadMedia } from "../../services/upload";
 import { supabase } from "../../services/supabase";
@@ -24,12 +24,14 @@ export function ChatScreen({ route, navigation }: any) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [recording, setRecording] = useState(false);
+    const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+    const [members, setMembers] = useState<any[]>([]);
     const userIdRef = useRef<string | null>(null);
     const notifChannelRef = useRef<any>(null);
     const recorderRef = useRef<Audio.Recording | null>(null);
 
     useEffect(() => {
-        const mapMessage = (m: any, myId: string | null): Message => ({
+        const mapMessage = (m: any, myId: string | null, starredIds: Set<string>): Message => ({
             id: m.id,
             senderId: m.sender_id,
             senderName: m.senderName ?? m.users?.username ?? "Unknown",
@@ -41,7 +43,15 @@ export function ChatScreen({ route, navigation }: any) {
             isMine: m.sender_id === myId,
             isPinned: m.is_pinned ?? false,
             deleted: m.deleted ?? false,
+            starred: starredIds.has(m.id),
             status: m.status ?? "sent",
+            replyTo: m.reply_to_message
+                ? {
+                    id: m.reply_to_message.id,
+                    senderName: m.reply_to_message.senderName ?? "Unknown",
+                    content: m.reply_to_message.content,
+                  }
+                : undefined,
         });
 
         const channel = supabase
@@ -52,7 +62,7 @@ export function ChatScreen({ route, navigation }: any) {
                 table: "messages",
                 filter: `group_id=eq.${groupId}`,
             }, (payload) => {
-                setMessages(prev => [...prev, mapMessage(payload.new, userIdRef.current)]);
+                setMessages(prev => [...prev, mapMessage(payload.new, userIdRef.current, new Set())]);
             })
             .subscribe();
 
@@ -64,8 +74,16 @@ export function ChatScreen({ route, navigation }: any) {
                     userIdRef.current = payload.userId as string;
                     notifChannelRef.current = subscribeToNotifications(userIdRef.current);
                 }
-                const data = await fetchMessages(groupId);
-                setMessages((data.messages ?? []).reverse().map((m: any) => mapMessage(m, userIdRef.current)));
+                const [msgData, starredIds] = await Promise.all([
+                    fetchMessages(groupId),
+                    fetchStarredIds(groupId),
+                ]);
+                const starredSet = new Set(starredIds);
+                setMessages((msgData.messages ?? []).reverse().map((m: any) => mapMessage(m, userIdRef.current, starredSet)));
+
+                // load group members for @mention
+                const { data: groupData } = await (await import("../../services/chatService")).getGroup(groupId) as any;
+                if (groupData?.group?.group_members) setMembers(groupData.group.group_members);
             } catch (err) {
                 console.error("Failed to load messages", err);
             }
@@ -181,12 +199,30 @@ export function ChatScreen({ route, navigation }: any) {
         }
     };
 
+    const handleStar = async (id: string) => {
+        const msg = messages.find(m => m.id === id);
+        if (!msg) return;
+        try {
+            if (msg.starred) {
+                await unstarMessage(id);
+                setMessages(prev => prev.map(m => m.id === id ? { ...m, starred: false } : m));
+            } else {
+                await starMessage(id);
+                setMessages(prev => prev.map(m => m.id === id ? { ...m, starred: true } : m));
+            }
+        } catch (err) {
+            console.error("Star failed", err);
+        }
+    };
+
     const handleSend = async () => {
         if (!input.trim()) return;
         const content = input.trim();
+        const replyId = replyingTo?.id;
         setInput("");
+        setReplyingTo(null);
         try {
-            await sendMessage(groupId, content);
+            await sendMessage(groupId, content, "text", undefined, replyId);
         } catch (err) {
             console.error("Send failed", err);
         }
@@ -211,6 +247,8 @@ export function ChatScreen({ route, navigation }: any) {
                     onDelete={handleDelete}
                     onShare={handleShare}
                     onPin={handlePin}
+                    onReply={id => setReplyingTo(messages.find(m => m.id === id) ?? null)}
+                    onStar={handleStar}
                 />
                 <MessageInput
                     value={input}
@@ -219,6 +257,9 @@ export function ChatScreen({ route, navigation }: any) {
                     onPickImage={handlePickMedia}
                     onRecordAudio={handleRecordAudio}
                     recording={recording}
+                    replyingTo={replyingTo}
+                    onCancelReply={() => setReplyingTo(null)}
+                    members={members}
                 />
             </KeyboardAvoidingView>
         </View>
@@ -226,6 +267,6 @@ export function ChatScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: "#0F172A" },
+    container: { flex: 1 },
     flex: { flex: 1 },
 });

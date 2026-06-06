@@ -2,8 +2,8 @@ import cors from "cors"
 import "dotenv/config"
 import express from "express"
 import { requireUser, requireCronSecret, walletLogin } from "./src/mod/auth"
-import { loginOrSignupRouter, resetPasswordRouter, savePushTokenRouter, getNonceRouter } from "./src/routes/auth"
-import { deleteMessageRouter, pinMessageRouter, fetchUserGroupsRouter, createGroupChatRouter, deleteGroupRouter, fetchMessagesRouter, fetchUnreadNotificationsRouter, getGroupRouter, getUnreadCountRouter, leaveGroupRouter, makeAdminRouter, markAsReadRouter, markNotificationsReadRouter, removeMemberRouter, sendMessageRouter } from "./src/routes/chat"
+import { loginOrSignupRouter, resetPasswordRouter, savePushTokenRouter, getNonceRouter, deleteAccountRouter } from "./src/routes/auth"
+import { deleteMessageRouter, pinMessageRouter, fetchUserGroupsRouter, createGroupChatRouter, deleteGroupRouter, fetchMessagesRouter, fetchUnreadNotificationsRouter, getGroupRouter, getUnreadCountRouter, leaveGroupRouter, makeAdminRouter, markAsReadRouter, markNotificationsReadRouter, removeMemberRouter, sendMessageRouter, starMessageRouter, unstarMessageRouter, fetchStarredIdsRouter } from "./src/routes/chat"
 import { fetchCollectiblesRouter, getTicketProofRouter, transferTicketRouter, initiatePaystackPayRouter, getPaymentOptionsRouter, confirmWalletPurchaseRouter, initiatepaystackWebhookRouter, paystackReturn } from "./src/routes/collectibles"
 import { createEventRouter, expireEventsRouter, burnExpiredTicketsRouter, fetchEventsRouter, likeEventRouter, mintTicketsRouter, preSaveRouter, eventMetadataRouter, ticketMetadataRouter, uploadFlyerRouter } from "./src/routes/events"
 import { createStoryRouter, deleteStoryRouter, deleteSubStoryRouter, fetchDiscoverStoriesRouter, fetchStoriesPreviewRouter, fetchStoriesRouter, fetchStoryByUserRouter, fetchStoryLikesRouter, fetchStoryViewsRouter, likeStoryRouter, unlikeStoryRouter, viewStoryRouter } from "./src/routes/stories"
@@ -22,6 +22,7 @@ const router = express.Router();
 
 router.post("/login", loginOrSignupRouter);
 router.post("/reset-password", resetPasswordRouter);
+router.post("/delete-account", requireUser, deleteAccountRouter);
 router.post("/save-push-token", requireUser, savePushTokenRouter);
 router.get("/auth/nonce", getNonceRouter);
 
@@ -77,6 +78,9 @@ router.post("/fetch-hosted-events", requireUser, fetchHostedEventsRouter);
 router.get("/fetch-user-groups", requireUser, fetchUserGroupsRouter);
 router.post("/delete-message", requireUser, deleteMessageRouter);
 router.post("/pin-message", requireUser, pinMessageRouter);
+router.post("/star-message", requireUser, starMessageRouter);
+router.post("/unstar-message", requireUser, unstarMessageRouter);
+router.get("/starred-messages", requireUser, fetchStarredIdsRouter);
 router.post("/create-group", requireUser, createGroupChatRouter); //probably not needed
 router.get("/get-group", requireUser, getGroupRouter);
 router.post("/send-message", requireUser, sendMessageRouter);
