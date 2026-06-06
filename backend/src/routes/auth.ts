@@ -1,4 +1,4 @@
-import { loginOrSignup, resetPassword, savePushToken, getNonce } from "../mod/auth";
+import { loginOrSignup, resetPassword, savePushToken, getNonce, deleteAccount } from "../mod/auth";
 import { AuthRequest } from "../mod/auth";
 import { Response, Request } from "express";
 
@@ -38,4 +38,13 @@ export async function savePushTokenRouter(req: AuthRequest, res: Response) {
 
 export function getNonceRouter(req: Request, res: Response) {
     return getNonce(req, res);
+}
+
+export async function deleteAccountRouter(req: AuthRequest, res: Response) {
+    try {
+        const result = await deleteAccount(req.user!.id);
+        res.json(result);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
 }

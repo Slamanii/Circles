@@ -6,11 +6,13 @@ import { getColors } from "../../shared/theme"
 type Props = {
     messages: any[];
     onDelete: (id: string) => void;
-    onShare: (id: string) => void;
-    onPin: (id: string) => void;
+    onShare:  (id: string) => void;
+    onPin:    (id: string) => void;
+    onReply:  (id: string) => void;
+    onStar:   (id: string) => void;
 };
 
-export function MessageList({ messages, onDelete, onShare, onPin }: Props) {
+export function MessageList({ messages, onDelete, onShare, onPin, onReply, onStar }: Props) {
     const C = getColors(useAppTheme().theme);
 
     const renderItem = ({ item, index }: any) => {
@@ -29,6 +31,8 @@ export function MessageList({ messages, onDelete, onShare, onPin }: Props) {
                     onDelete={() => onDelete(item.id)}
                     onShare={() => onShare(item.id)}
                     onPin={() => onPin(item.id)}
+                    onReply={() => onReply(item.id)}
+                    onStar={() => onStar(item.id)}
                 />
             </View>
         );

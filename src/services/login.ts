@@ -2,6 +2,16 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL;
 
+export async function deleteAccount() {
+    const token = await AsyncStorage.getItem("token");
+    const res = await fetch(`${API_URL}/api/delete-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) throw new Error("Failed to request account deletion");
+    return res.json();
+}
+
 export async function walletLogin(walletAddress: string, signature: string, message: string) {
     try {
         const res = await fetch(`${API_URL}/api/wallet-login`, {

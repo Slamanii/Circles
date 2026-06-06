@@ -224,3 +224,19 @@ export function decryptPrivateKey(encryptedKey: string) {
     decrypted += decipher.final("utf8");
     return decrypted;
 }
+
+export async function deleteAccount(userId: string) {
+    const scheduledFor = new Date();
+    scheduledFor.setDate(scheduledFor.getDate() + 30);
+
+    const { error } = await supabase
+        .from("users")
+        .update({
+            pending_deletion: true,
+            deletion_scheduled_at: scheduledFor.toISOString(),
+        })
+        .eq("id", userId);
+
+    if (error) throw error;
+    return { scheduled_for: scheduledFor.toISOString() };
+}

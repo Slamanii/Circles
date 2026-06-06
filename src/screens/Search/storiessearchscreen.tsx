@@ -1,6 +1,8 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { VIEWED_KEY } from "../Stories/storieslogic";
 import {
     Animated,
     FlatList,
@@ -19,22 +21,28 @@ import useSearchLogic from "./searchlogic";
 // Two mutually exclusive screen modes — like a switch/case over UI state
 type Mode = "stories" | "search";
 
-function StoryCircle({ item, onPress }: { item: any; onPress: () => void }) {
+function StoryCircle({ item, onPress, viewed }: { item: any; onPress: () => void; viewed: boolean }) {
+    const avatar = { uri: item.subStories?.[0]?.mediaUrl ?? item.storyItems?.[0]?.media_url };
     return (
         <TouchableOpacity style={styles.storyItem} onPress={onPress}>
-            <LinearGradient
-                colors={["#FF0080", "#FF8C00", "#40E0D0", "#7B2FBE"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.storyGradientRing}
-            >
-                <View style={styles.storyInnerBorder}>
-                    <Image
-                        source={{ uri: item.subStories?.[0]?.mediaUrl ?? item.storyItems?.[0]?.media_url }}
-                        style={styles.storyAvatar}
-                    />
+            {viewed ? (
+                <View style={[styles.storyGradientRing, styles.storyViewedRing]}>
+                    <View style={styles.storyInnerBorder}>
+                        <Image source={avatar} style={styles.storyAvatar} />
+                    </View>
                 </View>
-            </LinearGradient>
+            ) : (
+                <LinearGradient
+                    colors={["#FF0080", "#FF8C00", "#40E0D0", "#7B2FBE"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.storyGradientRing}
+                >
+                    <View style={styles.storyInnerBorder}>
+                        <Image source={avatar} style={styles.storyAvatar} />
+                    </View>
+                </LinearGradient>
+            )}
             <Text style={styles.storyName} numberOfLines={1}>
                 {item.userName ?? item.users?.username}
             </Text>
@@ -94,6 +102,7 @@ export default function StoriesSearchScreen() {
     const C = getColors(useAppTheme().theme);
     const [mode, setMode] = useState<Mode>("stories");
     const [refreshing, setRefreshing] = useState(false);
+    const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
     const inputRef = useRef<TextInput>(null);
     const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -113,6 +122,22 @@ export default function StoriesSearchScreen() {
         reload,
     } = useSearchLogic();
 
+    const loadViewedIds = async () => {
+        try {
+            const raw = await AsyncStorage.getItem(VIEWED_KEY);
+            setViewedIds(new Set(raw ? JSON.parse(raw) : []));
+        } catch { /* non-critical */ }
+    };
+
+    useEffect(() => { loadViewedIds(); }, []);
+
+    // Sort: unviewed first, viewed at the back
+    const sortedStories = [...(stories ?? [])].sort((a, b) => {
+        const aViewed = viewedIds.has(a.storyId ?? a.id) ? 1 : 0;
+        const bViewed = viewedIds.has(b.storyId ?? b.id) ? 1 : 0;
+        return aViewed - bViewed;
+    });
+
     const enterSearch = () => {
         setMode("search");
         Animated.timing(fadeAnim, { toValue: 1, duration: 180, useNativeDriver: true }).start();
@@ -128,7 +153,7 @@ export default function StoriesSearchScreen() {
 
     const onRefresh = async () => {
         setRefreshing(true);
-        await reload?.();
+        await Promise.all([reload?.(), loadViewedIds()]);
         setRefreshing(false);
     };
 
@@ -151,7 +176,7 @@ export default function StoriesSearchScreen() {
 
                 {/* Horizontal story circles */}
                 <FlatList
-                    data={stories}
+                    data={sortedStories}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                     keyExtractor={(item) => item.storyId ?? item.id}
@@ -167,6 +192,7 @@ export default function StoriesSearchScreen() {
                     renderItem={({ item }) => (
                         <StoryCircle
                             item={item}
+                            viewed={viewedIds.has(item.storyId ?? item.id)}
                             onPress={() => onStoryPress(item.storyId ?? item.id)}
                         />
                     )}
@@ -358,11 +384,14 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         alignItems: "center",
     },
+    storyViewedRing: {
+        backgroundColor: "#666",
+    },
     storyInnerBorder: {
         width: "100%",
         height: "100%",
         borderRadius: 30,
-        borderWidth: 2,        // white gap between gradient and avatar
+        borderWidth: 2,
         borderColor: Colors.white,
         overflow: "hidden",
     },

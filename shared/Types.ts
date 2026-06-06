@@ -106,12 +106,10 @@ export type Message = {
   edited?: boolean;
   deleted?: boolean;
   isMine: boolean;
-  status?: "sending" | "sent" | "delivered" | "read"; 
-  media?: {
-    uri: string;
-    thumbnail?: string;
-    duration?: number;
-  }
+  starred?: boolean;
+  status?: "sending" | "sent" | "delivered" | "read";
+  media?: { uri: string; thumbnail?: string; duration?: number };
+  replyTo?: { id: string; senderName: string; content: string };
 };
 
 export type MessageBubbleProps = {
