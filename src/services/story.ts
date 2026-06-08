@@ -122,9 +122,12 @@ export async function fetchStoriesPreview() {
     }
 }
 
-export async function fetchStoryByUser() {
+export async function fetchStoryByUser(userId?: string) {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-stories-by-user`, {
+        const url = userId
+            ? `${API_URL}/api/fetch-stories-by-user?userId=${userId}`
+            : `${API_URL}/api/fetch-stories-by-user`;
+        const res = await fetch(url, {
             method: "GET",
             headers: await authHeaders(),
         });

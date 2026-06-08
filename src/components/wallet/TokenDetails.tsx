@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { TokenDetailsType } from "../../../shared/Types";
+import { formatFiat } from "../../services/currency";
 
 const SYMBOL_COLORS: Record<string, string> = {
     SOL:  "#9945FF",
@@ -10,10 +11,19 @@ const SYMBOL_COLORS: Record<string, string> = {
     BTC:  "#F7931A",
 };
 
-function TokenLogo({ symbol, logoURI }: { symbol: string; logoURI?: string }) {
+const JUP_KNOWN = new Set([
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+    "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", // USDT
+    "So11111111111111111111111111111111111111112",    // SOL
+]);
+
+function TokenLogo({ id, symbol, logoURI }: { id: string; symbol: string; logoURI?: string }) {
     const [imgError, setImgError] = useState(false);
 
-    if (logoURI && !imgError) {
+    // Only trust the img.jup.ag URL for tokens we know are in their catalogue
+    const useRemote = (logoURI && !imgError) && JUP_KNOWN.has(id);
+
+    if (useRemote) {
         return (
             <Image
                 source={{ uri: logoURI }}
@@ -38,21 +48,21 @@ function formatBalance(balance: number, symbol: string): string {
     return `${balance.toFixed(2)} ${symbol}`;
 }
 
-export function TokenDetails({ onPress, token }: TokenDetailsType) {
+export function TokenDetails({ onPress, token, currency = "USD", ngnRate = 0 }: TokenDetailsType) {
+    const priceStr = (currency === "NGN" && ngnRate === 0)
+        ? "Rate unavailable"
+        : formatFiat(token.priceInUSD ?? 0, currency, ngnRate);
+
     return (
         <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
-            <TokenLogo symbol={token.symbol} logoURI={token.logoURI} />
+            <TokenLogo id={token.id} symbol={token.symbol} logoURI={token.logoURI} />
 
             <View style={styles.info}>
                 <Text style={styles.name}>{token.name}</Text>
                 <Text style={styles.sub}>{formatBalance(token.balance, token.symbol)}</Text>
             </View>
 
-            <Text style={styles.price}>
-                {typeof token.priceInUSD === "number"
-                    ? `$${token.priceInUSD.toFixed(2)}`
-                    : "$0.00"}
-            </Text>
+            <Text style={styles.price}>{priceStr}</Text>
         </TouchableOpacity>
     );
 }

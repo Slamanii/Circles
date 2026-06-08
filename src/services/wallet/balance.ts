@@ -6,6 +6,14 @@ const HELIUS_RPC = process.env.EXPO_PUBLIC_HELIUS_RPC_URL!;
 const connection = new Connection(HELIUS_RPC);
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
+// Default tokens always shown — zero balance if the wallet doesn't hold them
+const DEFAULT_SPL: { id: string; name: string; symbol: string; decimals: number }[] = [
+    { id: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", name: "USD Coin",      symbol: "USDC", decimals: 6 },
+    { id: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", name: "Tether USD",    symbol: "USDT", decimals: 6 },
+    { id: "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs", name: "Wrapped Ether", symbol: "ETH",  decimals: 8 },
+    // cNGN injected at runtime from env so the address stays out of source
+].filter(m => !!m.id);
+
 async function fetchSolPriceUSD(): Promise<number> {
     try {
         const resp = await fetch(`https://lite-api.jup.ag/price/v2?ids=${SOL_MINT}`);
@@ -103,7 +111,35 @@ export async function fetchSolBalances(walletAddress: string): Promise<{ sol: nu
         })
         .filter((t: Token) => t.balance > 0);
 
-    const tokens = [solToken, ...splTokens];
+    // Build the full default list at runtime so cNGN mint comes from env
+    const cNGNMint = process.env.EXPO_PUBLIC_CNGN_MINT;
+    const allDefaults = [
+        ...DEFAULT_SPL,
+        ...(cNGNMint && !cNGNMint.startsWith("REPLACE")
+            ? [{ id: cNGNMint, name: "cNGN", symbol: "cNGN", decimals: 6 }]
+            : []),
+    ];
+
+    // Inject defaults that the wallet doesn't currently hold (shown with 0 balance)
+    const heldIds = new Set(splTokens.map(t => t.id));
+    const zeroDefaults: Token[] = allDefaults
+        .filter(d => !heldIds.has(d.id))
+        .map(d => ({
+            id: d.id,
+            name: d.name,
+            symbol: d.symbol,
+            coingeckoId: "",
+            logoURI: `https://img.jup.ag/tokens/${d.id}`,
+            tokenAccount: undefined,
+            decimals: d.decimals,
+            balance: 0,
+            priceInSol: 0,
+            priceInUSD: 0,
+            chart: null,
+        }));
+
+    // Order: SOL → zero defaults → held SPL tokens
+    const tokens = [solToken, ...zeroDefaults, ...splTokens];
     const totalUSD = tokens.reduce((sum, t) => sum + t.priceInUSD, 0);
 
     return { sol: solAmount, tokens, totalUSD };

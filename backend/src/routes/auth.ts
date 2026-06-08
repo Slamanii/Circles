@@ -1,4 +1,4 @@
-import { loginOrSignup, resetPassword, savePushToken, getNonce, deleteAccount } from "../mod/auth";
+import { loginOrSignup, resetPassword, savePushToken, getNonce, deleteAccount, exportWalletSecret } from "../mod/auth";
 import { AuthRequest } from "../mod/auth";
 import { Response, Request } from "express";
 
@@ -46,5 +46,15 @@ export async function deleteAccountRouter(req: AuthRequest, res: Response) {
         res.json(result);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
+    }
+}
+
+export async function exportWalletSecretRouter(req: AuthRequest, res: Response) {
+    try {
+        const result = await exportWalletSecret(req.user!.id);
+        res.json(result);
+    } catch (error: any) {
+        const status = error.message.includes("No custodial") ? 404 : 500;
+        res.status(status).json({ error: error.message });
     }
 }

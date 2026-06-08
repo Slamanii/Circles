@@ -7,6 +7,7 @@ import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 import { updateProfile } from "../../services/user";
 import { deleteAccount } from "../../services/login";
+import { resetBiometricSession } from "../Wallet/walletscreen";
 
 function dividerColor(theme: string) {
     return theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.12)";
@@ -55,6 +56,7 @@ export default function SettingsScreen() {
     };
 
     const logout = async () => {
+        resetBiometricSession();
         await AsyncStorage.multiRemove(["token", "user", "active_wallet"]);
         navigation.replace("login" as never);
     };

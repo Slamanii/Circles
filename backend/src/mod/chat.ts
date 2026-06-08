@@ -120,17 +120,12 @@ export async function sendMessage({
 
     if (error) throw error;
 
-    // notify group members
-    await supabase.from("notifications").insert({
-        user_id: userId,
-        type: "chat",
-        title: "New Message",
-        message: "You received a new group message",
-        reference_id: groupId,
-        reference_type: "group",
-    });
+    // Device push for all group members is handled client-side — each member's
+    // NotificationProvider subscribes to the messages table and fires a local
+    // push notification showing sender name + content preview.
+    // The notifications table is only used for in-app panel entries (mentions, events, etc).
 
-    // notify @mentioned users
+    // @mentioned users get an in-app panel notification as well as the device push
     const mentionMatches = content.match(/@(\w+)/g) ?? [];
     for (const mention of mentionMatches) {
         const username = mention.slice(1);
@@ -144,7 +139,7 @@ export async function sendMessage({
                 user_id: mentioned.id,
                 type: "mention",
                 title: `${user?.username ?? "Someone"} mentioned you`,
-                message: content,
+                body: content,
                 reference_id: groupId,
                 reference_type: "group",
             });
@@ -224,7 +219,7 @@ export async function removeMember({
             user_id: userId,
             type: "chat",
             title: "New Message",
-            message: "You were removed from the group",
+            body: "You were removed from the group",
             reference_id: groupId,
             reference_type: "group"
             });
@@ -298,7 +293,7 @@ export async function leaveGroup({
             user_id: userId,
             type: "chat",
             title: "New Message",
-            message: "You left the group.",
+            body: "You left the group.",
             reference_id: groupId,
             reference_type: "group"
             });
@@ -368,7 +363,7 @@ export async function makeAdmin({
             user_id: targetUserId,
             type: "chat",
             title: "New Message",
-            message: "You are now an admin",
+            body: "You are now an admin",
             reference_id: groupId,
             reference_type: "group"
             });
@@ -497,4 +492,15 @@ export async function markNotificationsRead(userId: string) {
     .eq("is_read", false);
 
   return { success: true };
+}
+export async function fetchNotifications(userId: string, limit = 30, offset = 0) {
+    const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+    return data ?? [];
 }

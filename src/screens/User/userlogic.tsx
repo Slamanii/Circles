@@ -9,6 +9,7 @@ import {
     followUser,
     getUserProfile,
 } from "../../services/user";
+import { fetchStoryByUser } from "../../services/story";
 
 const PAGE_SIZE = 5;
 
@@ -31,6 +32,7 @@ export function useUserLogic(followingId?: string) {
 
     const [hostedEvents, setHostedEvents] = useState<any[]>([]);
     const [likedEvents, setLikedEvents] = useState<any[]>([]);
+    const [userStories, setUserStories] = useState<any[]>([]);
     const [hostedVisible, setHostedVisible] = useState(PAGE_SIZE);
     const [likedVisible, setLikedVisible] = useState(PAGE_SIZE);
 
@@ -57,12 +59,15 @@ export function useUserLogic(followingId?: string) {
             setCanViewContent(profileData.canViewContent ?? true);
             setIsOwnProfile(!followingId || followingId === storedUser?.id);
 
-            const [events, liked] = await Promise.all([
+            const [events, liked, stories] = await Promise.all([
                 fetchHostedEvents(followingId).catch(() => []),
-                fetchLikedEvents().catch(() => []),
+                // Only fetch own liked events — backend has no per-user liked-events endpoint
+                followingId ? Promise.resolve([]) : fetchLikedEvents().catch(() => []),
+                fetchStoryByUser(followingId).catch(() => []),
             ]);
             setHostedEvents(events ?? []);
             setLikedEvents(liked ?? []);
+            setUserStories(Array.isArray(stories) ? stories : []);
         } catch (err) {
             console.error("Failed to load profile", err);
         }
@@ -99,7 +104,7 @@ export function useUserLogic(followingId?: string) {
     return {
         username, displayName, avatar, bio, link1, link2,
         followers, following,
-        hostedEvents, likedEvents,
+        hostedEvents, likedEvents, userStories,
         hostedVisible, likedVisible,
         showMoreHosted, showMoreLiked,
         followed, isOwnProfile,

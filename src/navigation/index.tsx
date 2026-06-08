@@ -1,12 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { BlurView } from "expo-blur";
 import { StyleSheet } from "react-native";
 import { useAppTheme } from "../context/ThemeContext";
 
+import { ChatControlScreen } from "../screens/Chat/chatcontrolscreen";
 import { ChatListScreen } from "../screens/Chat/chatlistscreen";
 import { ChatScreen } from "../screens/Chat/chatscreen";
+import MediaViewerScreen from "../screens/Chat/MediaViewerScreen";
 import CollectiblesScreen from "../screens/Collectibles/collectiblesscreen";
 import SendTicketScreen from "../screens/Collectibles/sendTicketScreen";
 import TicketInfoScreen from "../screens/Collectibles/TicketInfoScreen";
@@ -15,10 +18,14 @@ import CreateEventScreen from "../screens/Event/createEventScreen";
 import EventPurchaseScreen from "../screens/Event/eventPurchaseScreen";
 import EventScreen from "../screens/Event/eventscreen";
 import HomeScreen from "../screens/Home/homescreen";
+import NotificationsScreen from "../screens/Notifications/notificationsscreen";
 import StoriesSearchScreen from "../screens/Search/storiessearchscreen";
 import StoryScreen from "../screens/Stories/storiesscreen";
 import StoryUploadScreen from "../screens/Stories/uploadstoriesscreen";
-
+import EditProfileScreen from "../screens/User/editprofilescreen";
+import SettingsScreen from "../screens/User/settingsscreen";
+import UserMetrics from "../screens/User/usermetricsscreen";
+import UserScreen from "../screens/User/userscreen";
 import BuyScreen from "../screens/Wallet/subScreen.tsx/Buy";
 import BuyFormScreen from "../screens/Wallet/subScreen.tsx/BuyFormScreen";
 import ChartScreen from "../screens/Wallet/subScreen.tsx/Chart";
@@ -32,10 +39,13 @@ import SwapScreen from "../screens/Wallet/subScreen.tsx/Swap";
 import TxHistoryScreen from "../screens/Wallet/subScreen.tsx/TxHistory";
 import WalletScreen from "../screens/Wallet/walletscreen";
 
-import EditProfileScreen from "../screens/User/editprofilescreen";
-import SettingsScreen from "../screens/User/settingsscreen";
-import UserMetrics from "../screens/User/usermetricsscreen";
-import UserScreen from "../screens/User/userscreen";
+// Screens inside these stacks that have a back button → hide the floating tab bar
+const HIDE_TAB_ON: Record<string, string[]> = {
+  Home:         ["EventDetails", "ChatListScreen", "ChatScreen", "ChatControl", "Notifications", "MediaViewer"],
+  Search:       ["StoryDetail", "StoryUpload", "UserProfile"],
+  Collectibles: ["TicketInfo", "TicketQR", "SendTicket"],
+  Profile:      ["lists"],
+};
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator() as ReturnType<typeof createNativeStackNavigator>;
@@ -44,10 +54,13 @@ const Root = createNativeStackNavigator() as ReturnType<typeof createNativeStack
 function HomeStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="HomeMain" component={HomeScreen} />
-      <Stack.Screen name="EventDetails" component={EventScreen} />
-      <Stack.Screen name="ChatScreen" component={ChatScreen} />
+      <Stack.Screen name="HomeMain"      component={HomeScreen} />
+      <Stack.Screen name="EventDetails"  component={EventScreen} />
       <Stack.Screen name="ChatListScreen" component={ChatListScreen} />
+      <Stack.Screen name="ChatScreen"    component={ChatScreen} />
+      <Stack.Screen name="ChatControl"   component={ChatControlScreen} />
+      <Stack.Screen name="MediaViewer"   component={MediaViewerScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }
@@ -141,6 +154,21 @@ function Tabs() {
   const { theme } = useAppTheme();
   const isDark = theme === "dark";
 
+  const visibleBar = [
+    tabStyles.bar,
+    isDark
+      ? { shadowColor: "#000", shadowOpacity: 0.5 }
+      : { shadowColor: "#000", shadowOpacity: 0.18 },
+  ] as const;
+
+  function barStyle(tabName: string, route: any) {
+    const focused = getFocusedRouteNameFromRoute(route);
+    if (focused && HIDE_TAB_ON[tabName]?.includes(focused)) {
+      return { display: "none" as const };
+    }
+    return visibleBar;
+  }
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -154,12 +182,7 @@ function Tabs() {
           paddingTop: 0,
           paddingBottom: 0,
         },
-        tabBarStyle: [
-          tabStyles.bar,
-          isDark
-            ? { shadowColor: "#000", shadowOpacity: 0.5 }
-            : { shadowColor: "#000", shadowOpacity: 0.18 },
-        ],
+        tabBarStyle: visibleBar,
         tabBarBackground: () => (
           <BlurView
             tint={isDark ? "dark" : "light"}
@@ -174,11 +197,15 @@ function Tabs() {
         },
       })}
     >
-      <Tab.Screen name="Home"         component={HomeStack} />
-      <Tab.Screen name="Search"       component={SearchStack} />
-      <Tab.Screen name="Collectibles" component={CollectiblesStack} />
+      <Tab.Screen name="Home"         component={HomeStack}
+        options={({ route }) => ({ tabBarStyle: barStyle("Home", route) })} />
+      <Tab.Screen name="Search"       component={SearchStack}
+        options={({ route }) => ({ tabBarStyle: barStyle("Search", route) })} />
+      <Tab.Screen name="Collectibles" component={CollectiblesStack}
+        options={({ route }) => ({ tabBarStyle: barStyle("Collectibles", route) })} />
       <Tab.Screen name="Wallet"       component={WalletStack} />
-      <Tab.Screen name="Profile"      component={UserStack} />
+      <Tab.Screen name="Profile"      component={UserStack}
+        options={({ route }) => ({ tabBarStyle: barStyle("Profile", route) })} />
     </Tab.Navigator>
   );
 }
