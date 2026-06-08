@@ -1,4 +1,4 @@
-import { createGroupChat, getGroup, sendMessage, removeMember, fetchMessages, leaveGroup, deleteGroup, makeAdmin, fetchUnreadNotifications, markNotificationsRead, fetchUserGroups, deleteMessage, pinMessage, starMessage, unstarMessage, fetchStarredIds } from "../mod/chat";
+import { createGroupChat, getGroup, sendMessage, removeMember, fetchMessages, leaveGroup, deleteGroup, makeAdmin, fetchUnreadNotifications, markNotificationsRead, fetchUserGroups, deleteMessage, pinMessage, starMessage, unstarMessage, fetchStarredIds, fetchNotifications } from "../mod/chat";
 import { markAsRead, getUnreadCount } from "../services/chat.service"
 import { AuthRequest } from "../mod/auth"
 import { Response } from "express" 
@@ -48,6 +48,18 @@ export async function unstarMessageRouter(req: AuthRequest, res: Response) {
         if (!messageId) return res.status(400).json({ error: "Missing messageId" });
         const result = await unstarMessage(userId, messageId);
         res.json(result);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+}
+
+export async function fetchNotificationsRouter(req: AuthRequest, res: Response) {
+    try {
+        const userId = req.user!.id;
+        const limit  = parseInt(req.query.limit  as string) || 30;
+        const offset = parseInt(req.query.offset as string) || 0;
+        const data   = await fetchNotifications(userId, limit, offset);
+        res.json({ notifications: data });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

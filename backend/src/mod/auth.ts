@@ -58,7 +58,8 @@ export async function loginOrSignup(email: string, password: string) {
     if (!user) {
         const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
         const wallet = generateSolanaWallet();
-        const encrypted_private_key = encryptPrivateKey(wallet.secretKey);
+        // encrypted_private_key repurposed: now stores the AES-encrypted BIP39 mnemonic
+        const encrypted_private_key = encryptPrivateKey(wallet.mnemonic);
 
         const { data, error } = await supabase
             .from("users")
@@ -75,6 +76,10 @@ export async function loginOrSignup(email: string, password: string) {
 
         if (error) throw error;
         user = data;
+
+        const token = signToken(user.id, user.email);
+        // Return mnemonic only on first creation so the client can show it once
+        return { user, token, mnemonic: wallet.mnemonic };
     } else {
         if (!user.password_hash) {
             throw new Error("This account uses wallet login");
@@ -223,6 +228,22 @@ export function decryptPrivateKey(encryptedKey: string) {
     let decrypted = decipher.update(encrypted, "hex", "utf8");
     decrypted += decipher.final("utf8");
     return decrypted;
+}
+
+export async function exportWalletSecret(userId: string): Promise<{ secret: string; format: "mnemonic" | "legacy_key" }> {
+    const { data: user, error } = await supabase
+        .from("users")
+        .select("encrypted_private_key")
+        .eq("id", userId)
+        .single();
+
+    if (error || !user) throw new Error("User not found");
+    if (!user.encrypted_private_key) throw new Error("No custodial wallet on this account");
+
+    const secret = decryptPrivateKey(user.encrypted_private_key);
+    // BIP39 mnemonics contain spaces; base64 secret keys do not
+    const format = secret.includes(" ") ? "mnemonic" : "legacy_key";
+    return { secret, format };
 }
 
 export async function deleteAccount(userId: string) {

@@ -4,7 +4,7 @@ ALTER TABLE wallet_holdings
 
 ALTER TABLE wallet_holdings
     ADD CONSTRAINT wallet_holdings_token_type_check
-        CHECK (token_type IN ('solana', 'usdt', 'ethereum', 'cngn'));
+        CHECK (token_type IN ('solana', 'usdc', 'usdt', 'ethereum', 'cngn'));
 
 -- Add last_synced for cache freshness tracking
 ALTER TABLE wallet_holdings

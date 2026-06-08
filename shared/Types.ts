@@ -195,7 +195,8 @@ export type WalletTokens = {
 };
 
 export type WalletControlPanelType = {
-    balance: string;
+    solDisplay: string;
+    fiatDisplay: string;
     onReceive: () => void;
     onSend: () => void;
     onSwap: () => void;
@@ -205,6 +206,8 @@ export type WalletControlPanelType = {
 export type TokenDetailsType = {
     token: Token;
     onPress: () => void;
+    currency?: "USD" | "NGN";
+    ngnRate?: number;
 };
 
 

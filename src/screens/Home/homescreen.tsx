@@ -122,7 +122,7 @@ export default function HomeScreen() {
             <HomeHeader
                 address={location}
                 onChatPress={onChatPress}
-                onNotificationsPress={() => {/* TODO: Notifications screen */}}
+                onNotificationsPress={() => navigation.navigate("Notifications")}
                 onLocationPress={() => navigation.navigate("EditProfile")}
             />
 

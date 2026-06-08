@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
+    Dimensions,
     Image,
     Linking,
     RefreshControl,
@@ -12,9 +13,12 @@ import {
     View,
 } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
-import { getColors } from "../../shared/theme";
+import { Colors, getColors } from "../../shared/theme";
 import { TAB_BAR_HEIGHT } from "../../navigation";
 import { useUserLogic } from "./userlogic";
+
+type Tab = "events" | "stories";
+const SCREEN_W = Dimensions.get("window").width;
 
 export default function UserScreen({ route }: any) {
     const followingId = route?.params?.followingId;
@@ -22,6 +26,7 @@ export default function UserScreen({ route }: any) {
     const C = getColors(theme);
 
     const [showMore, setShowMore] = useState(false);
+    const [activeTab, setActiveTab] = useState<Tab>("events");
 
     const {
         username,
@@ -40,6 +45,7 @@ export default function UserScreen({ route }: any) {
         unfollow,
         hostedEvents,
         likedEvents,
+        userStories,
         hostedVisible,
         likedVisible,
         showMoreHosted,
@@ -200,37 +206,46 @@ export default function UserScreen({ route }: any) {
                     </View>
                 ) : (
                     <>
-                        {/* My Events */}
-                        <Section title="My Events" C={C}>
-                            {hostedEvents.length === 0 ? (
-                                <Text style={[styles.empty, { color: C.textMuted }]}>No events hosted yet</Text>
-                            ) : (
-                                <>
-                                    {hostedEvents.slice(0, hostedVisible).map((ev) => (
-                                        <EventRow key={ev.id} event={ev} C={C} />
-                                    ))}
-                                    {hostedVisible < hostedEvents.length && (
-                                        <ShowMore onPress={showMoreHosted} C={C} />
-                                    )}
-                                </>
-                            )}
-                        </Section>
+                        {/* Tab switcher */}
+                        <TabSwitcher active={activeTab} onChange={setActiveTab} />
 
-                        {/* Liked Events */}
-                        <Section title="Liked Events" C={C}>
-                            {likedEvents.length === 0 ? (
-                                <Text style={[styles.empty, { color: C.textMuted }]}>No liked events yet</Text>
-                            ) : (
-                                <>
-                                    {likedEvents.slice(0, likedVisible).map((ev) => (
-                                        <EventRow key={ev.id} event={ev} C={C} />
-                                    ))}
-                                    {likedVisible < likedEvents.length && (
-                                        <ShowMore onPress={showMoreLiked} C={C} />
+                        {activeTab === "events" ? (
+                            <>
+                                {/* My Events */}
+                                <Section title="My Events" C={C}>
+                                    {hostedEvents.length === 0 ? (
+                                        <Text style={[styles.empty, { color: C.textMuted }]}>No events hosted yet</Text>
+                                    ) : (
+                                        <>
+                                            {hostedEvents.slice(0, hostedVisible).map((ev) => (
+                                                <EventRow key={ev.id} event={ev} C={C} />
+                                            ))}
+                                            {hostedVisible < hostedEvents.length && (
+                                                <ShowMore onPress={showMoreHosted} C={C} />
+                                            )}
+                                        </>
                                     )}
-                                </>
-                            )}
-                        </Section>
+                                </Section>
+
+                                {/* Liked Events */}
+                                <Section title="Liked Events" C={C}>
+                                    {likedEvents.length === 0 ? (
+                                        <Text style={[styles.empty, { color: C.textMuted }]}>No liked events yet</Text>
+                                    ) : (
+                                        <>
+                                            {likedEvents.slice(0, likedVisible).map((ev) => (
+                                                <EventRow key={ev.id} event={ev} C={C} />
+                                            ))}
+                                            {likedVisible < likedEvents.length && (
+                                                <ShowMore onPress={showMoreLiked} C={C} />
+                                            )}
+                                        </>
+                                    )}
+                                </Section>
+                            </>
+                        ) : (
+                            <StoriesGrid stories={userStories} C={C} />
+                        )}
                     </>
                 )}
             </ScrollView>
@@ -273,6 +288,125 @@ function ShowMore({ onPress, C }: { onPress: () => void; C: any }) {
         </TouchableOpacity>
     );
 }
+
+function TabSwitcher({ active, onChange }: { active: Tab; onChange: (t: Tab) => void }) {
+    return (
+        <View style={tabStyles.wrapper}>
+            <View style={tabStyles.labelRow}>
+                <TouchableOpacity style={tabStyles.tab} onPress={() => onChange("events")} activeOpacity={0.7}>
+                    <LinearGradient
+                        colors={["#E8622A", "#C94E1F"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={tabStyles.gradientText}
+                    >
+                        <Text style={tabStyles.label}>Events</Text>
+                    </LinearGradient>
+                </TouchableOpacity>
+                <TouchableOpacity style={tabStyles.tab} onPress={() => onChange("stories")} activeOpacity={0.7}>
+                    <LinearGradient
+                        colors={["#E8622A", "#C94E1F"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={tabStyles.gradientText}
+                    >
+                        <Text style={tabStyles.label}>Stories</Text>
+                    </LinearGradient>
+                </TouchableOpacity>
+            </View>
+            <View style={tabStyles.lineRow}>
+                {active === "events" ? (
+                    <LinearGradient
+                        colors={["#E8622A", "#C94E1F"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={tabStyles.lineHalf}
+                    />
+                ) : (
+                    <View style={[tabStyles.lineHalf, tabStyles.lineInactive]} />
+                )}
+                {active === "stories" ? (
+                    <LinearGradient
+                        colors={["#E8622A", "#C94E1F"]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={tabStyles.lineHalf}
+                    />
+                ) : (
+                    <View style={[tabStyles.lineHalf, tabStyles.lineInactive]} />
+                )}
+            </View>
+        </View>
+    );
+}
+
+function StoriesGrid({ stories, C }: { stories: any[]; C: any }) {
+    if (stories.length === 0) {
+        return (
+            <View style={gridStyles.empty}>
+                <Ionicons name="camera-outline" size={40} color={C.textMuted} />
+                <Text style={[gridStyles.emptyText, { color: C.textMuted }]}>No stories yet</Text>
+            </View>
+        );
+    }
+    return (
+        <View style={gridStyles.grid}>
+            {stories.map((story) => (
+                <View key={story.id} style={[gridStyles.cell, { backgroundColor: C.surface }]}>
+                    {story.media_url ? (
+                        <Image source={{ uri: story.media_url }} style={gridStyles.image} resizeMode="cover" />
+                    ) : (
+                        <View style={[gridStyles.image, { backgroundColor: C.surface }]} />
+                    )}
+                </View>
+            ))}
+        </View>
+    );
+}
+
+const CELL_SIZE = SCREEN_W / 3;
+
+const tabStyles = StyleSheet.create({
+    wrapper: { marginBottom: 8 },
+    labelRow: {
+        flexDirection: "row",
+    },
+    tab: { flex: 1, alignItems: "center", paddingVertical: 10 },
+    gradientText: {
+        paddingHorizontal: 4,
+        paddingVertical: 2,
+        borderRadius: 2,
+    },
+    label: {
+        fontSize: 15,
+        fontWeight: "700",
+        color: "#fff",
+        letterSpacing: 0.2,
+    },
+    lineRow: { flexDirection: "row" },
+    lineHalf: { flex: 1, height: 2.5 },
+    lineInactive: { backgroundColor: "rgba(150,150,150,0.25)" },
+});
+
+const gridStyles = StyleSheet.create({
+    grid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        marginBottom: 32,
+    },
+    cell: {
+        width: CELL_SIZE,
+        height: CELL_SIZE,
+    },
+    image: { width: "100%", height: "100%" },
+    empty: {
+        alignItems: "center",
+        paddingTop: 60,
+        paddingBottom: 32,
+        gap: 12,
+    },
+    emptyText: { fontSize: 15 },
+});
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
