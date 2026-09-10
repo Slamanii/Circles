@@ -239,6 +239,7 @@ export async function fetchMessages({
   limit?: number;
 }) {
 
+  console.log("[fetchMessages] groupId:", groupId, "userId:", userId);
   // Check membership
   const { data: member } = await supabase
     .from("group_members")
@@ -258,11 +259,10 @@ export async function fetchMessages({
       content,
       created_at,
       sender_id,
-      users (
-        id,
-        username,
-        avatar_url
-      )
+      senderName,
+      type,
+      media,
+      reply_to
     `)
     .eq("group_id", groupId)
     .order("created_at", { ascending: false })

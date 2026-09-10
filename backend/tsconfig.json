@@ -6,7 +6,8 @@
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
-    "moduleResolution": "node",
+    "moduleResolution": "node10",
+    "ignoreDeprecations": "5.0",
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "sourceMap": true,
@@ -14,8 +15,7 @@
     "declarationMap": true,
     "paths": {
       "@solana/spl-account-compression": ["./node_modules/@solana/spl-account-compression/dist/types/src/index.d.ts"],
-      "@src/*": ["../src/*"],
-
+      "@src/*": ["../src/*"]
     }
   },
   "include": ["src/**/*", "../target/types/**/*", "../shared/**/*"]

@@ -60,7 +60,7 @@ export default function EventPurchaseScreen({ route }: any) {
         savedIds,
         handleLike,
         handlePreSave,
-        handleGetTicket,
+
         handlePaystackPayment,
         handleWalletPayment,
         pickerVisible,
@@ -87,7 +87,7 @@ export default function EventPurchaseScreen({ route }: any) {
                     saved={savedIds.has(event.id)}
                     onLike={() => handleLike(event.id)}
                     onPreSave={() => handlePreSave(event.id)}
-                    onGetTicket={() => handleGetTicket(event.id)}
+                    onGetTicket={() => {}}
                 />
 
                 <Countdown eventDate={event.event_date ?? null} />

@@ -25,8 +25,9 @@ export async function createEventRouter(req: AuthRequest, res: Response) {
 
         res.status(201).json(result);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Failed to create event" });
+        const message = error instanceof Error ? error.message : "Failed to create event";
+        console.error("createEvent error:", message);
+        res.status(500).json({ error: message });
     }
 }
 

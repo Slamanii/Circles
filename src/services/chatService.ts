@@ -54,7 +54,10 @@ export async function fetchMessages(groupId: string, limit = 50) {
         headers: await authHeaders(),
         body: JSON.stringify({ groupId, limit }),
     });
-    if (!res.ok) throw new Error("Failed to fetch messages");
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as any).error ?? "Failed to fetch messages");
+    }
     return await res.json();
 }
 

@@ -1,21 +1,18 @@
 import { mplBubblegum, transferV2 } from "@metaplex-foundation/mpl-bubblegum"
-import { publicKey } from "@metaplex-foundation/umi"
+import { keypairIdentity, publicKey } from "@metaplex-foundation/umi"
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults"
-import { Connection } from "@solana/web3.js"
 import fs from "fs"
 
-//rewrite this 
-const umi = createUmi("https://api.mainnet-beta.solana.com")
-                .use(mplBubblegum())
-
-
-const connection = new Connection("https://api.mainnet-beta.solana.com");
 const secret = JSON.parse(
     fs.readFileSync("./treasury-keypair.json", "utf8")
 )
-export const treasuryKeypair = umi.eddsa.createKeypairFromSecretKey(
-   new  Uint8Array(secret)
-)
+
+const umi = createUmi(process.env.HELIUS_RPC_URL!)
+                .use(mplBubblegum())
+
+export const treasuryKeypair = umi.eddsa.createKeypairFromSecretKey(new Uint8Array(secret))
+
+umi.use(keypairIdentity(treasuryKeypair))
 
 
 /**

@@ -108,7 +108,7 @@ export async function unlikeStory({
 export async function deleteSubStory(subStoryId: string, userId: string) {
 
     const { data: substory } = await supabase
-        .from("storyItems")
+        .from("storyitems")
         .select("id, stories!inner(user_id)")
         .eq("id", subStoryId)
         .single();
@@ -123,7 +123,7 @@ export async function deleteSubStory(subStoryId: string, userId: string) {
         .eq("story_item_id", subStoryId);
 
     const { error } = await supabase
-        .from("storyItems")
+        .from("storyitems")
         .delete()
         .eq("id", subStoryId);
 
@@ -144,7 +144,7 @@ export async function deleteStory(storyId: string, userId: string) {
     }
 
     const { data: subs } = await supabase
-        .from("storyItems")
+        .from("storyitems")
         .select("id")
         .eq("story_id", storyId);
 
@@ -153,7 +153,7 @@ export async function deleteStory(storyId: string, userId: string) {
     await supabase.from("storylikes").delete().in("story_item_id", subIds);
     await supabase.from("storyViews").delete().in("story_item_id", subIds);
 
-    await supabase.from("storyItems").delete().eq("story_id", storyId);
+    await supabase.from("storyitems").delete().eq("story_id", storyId);
 
 
     await supabase.from("stories").delete().eq("id", storyId);
@@ -179,7 +179,7 @@ export async function fetchStories(userId: string) {
       user_id,
       created_at,
       users (username, avatar),
-      storyItems (
+      storyitems (
         id,
         media_url,
         caption,
@@ -214,7 +214,7 @@ export async function fetchStoriesPreview(userId: string) {
       id,
       user_id,
       users (username, avatar),
-      storyItems (
+      storyitems (
         id,
         media_url,
         created_at
@@ -252,16 +252,31 @@ export async function fetchDiscoverStories(currentUserId: string, limit: number 
 }
 
 export async function fetchStoryByUser(userId: string) {
+  console.log("[fetchStoryByUser] userId:", userId);
 
-  const { data, error } = await supabase
-    .from("sub_stories")
-    .select("*")
+  const { data: stories, error: storiesError } = await supabase
+    .from("stories")
+    .select("id, user_id, created_at, preview_media_snapshot")
     .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (storiesError) throw storiesError;
+  if (!stories?.length) return [];
+
+  const storyIds = stories.map(s => s.id);
+
+  const { data: items, error: itemsError } = await supabase
+    .from("storyitems")
+    .select("id, story_id, media_url, caption, media_type, created_at")
+    .in("story_id", storyIds)
     .order("created_at", { ascending: true });
 
-  if (error) throw error;
+  if (itemsError) throw itemsError;
 
-  return data;
+  return stories.map(s => ({
+    ...s,
+    storyitems: items?.filter(i => i.story_id === s.id) ?? [],
+  }));
 }
 
 export async function fetchStoryViews(subStoryId: string) {

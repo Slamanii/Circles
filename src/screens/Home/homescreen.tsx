@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import EventCard from "../../components/EventCard";
 import FilterSheet, { FilterSheetType } from "../../components/FilterSheet";
+import { LocationPicker } from "../../components/LocationPicker";
 import { useAppTheme } from "../../context/ThemeContext";
 import { useEventFilter } from "../../hooks/useEventFilter";
 import { Colors, getColors, Radius, TAB_PAD } from "../../shared/theme";
@@ -33,13 +34,14 @@ const CHIPS: Chip[] = [
 export default function HomeScreen() {
     const C = getColors(useAppTheme().theme);
     const navigation = useNavigation<any>();
-    const [refreshing, setRefreshing]   = useState(false);
-    const [searchActive, setSearchActive] = useState(false);
-    const [query, setQuery]             = useState("");
-    const [openSheet, setOpenSheet]     = useState<FilterSheetType | null>(null);
+    const [refreshing, setRefreshing]       = useState(false);
+    const [searchActive, setSearchActive]   = useState(false);
+    const [query, setQuery]                 = useState("");
+    const [openSheet, setOpenSheet]         = useState<FilterSheetType | null>(null);
+    const [showLocationPicker, setShowLocationPicker] = useState(false);
 
     const { events, loading, error, reload, likedIds, savedIds, handleLike } = useEventLogic();
-    const { location, handlePreSave, handleGetTicket, onChatPress, onEventPress } = useHomeLogic();
+    const { location, updateLocation, handlePreSave, handleGetTicket, onChatPress } = useHomeLogic();
 
     const {
         filtered,
@@ -123,7 +125,7 @@ export default function HomeScreen() {
                 address={location}
                 onChatPress={onChatPress}
                 onNotificationsPress={() => navigation.navigate("Notifications")}
-                onLocationPress={() => navigation.navigate("EditProfile")}
+                onLocationPress={() => setShowLocationPicker(true)}
             />
 
             {/* Nav row */}
@@ -216,16 +218,14 @@ export default function HomeScreen() {
                     />
                 }
                 renderItem={({ item }) => (
-                    <TouchableOpacity activeOpacity={0.9} onPress={() => onEventPress(item.id)}>
-                        <EventCard
-                            event={item}
-                            liked={likedIds.has(item.id)}
-                            saved={savedIds.has(item.id)}
-                            onLike={() => handleLike(item.id)}
-                            onPreSave={() => handlePreSave(item.id)}
-                            onGetTicket={() => handleGetTicket(item.id)}
-                        />
-                    </TouchableOpacity>
+                    <EventCard
+                        event={item}
+                        liked={likedIds.has(item.id)}
+                        saved={savedIds.has(item.id)}
+                        onLike={() => handleLike(item.id)}
+                        onPreSave={() => handlePreSave(item.id)}
+                        onGetTicket={() => handleGetTicket(item.id)}
+                    />
                 )}
                 ListEmptyComponent={
                     <View style={styles.empty}>
@@ -255,6 +255,12 @@ export default function HomeScreen() {
                     if (openSheet === "price")    setPriceRange({ min: null, max: null });
                     if (openSheet === "location") setSelectedLocation(null);
                 }}
+            />
+
+            <LocationPicker
+                visible={showLocationPicker}
+                onClose={() => setShowLocationPicker(false)}
+                onSelect={(city) => updateLocation(city)}
             />
         </View>
     );

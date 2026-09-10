@@ -163,9 +163,10 @@ export async function fetchMessagesRouter(req: AuthRequest, res: Response) {
     const result = await fetchMessages({ userId, ...messageData })
     res.status(201).json(result)
 
-    } catch (error) {
-        console.error(error)
-        res.status(500).json({error: "Failed to fetch message"})
+    } catch (error: any) {
+        console.error("fetchMessages error (full):", JSON.stringify(error));
+        const message = error?.message ?? error?.details ?? error?.hint ?? "Failed to fetch messages";
+        res.status(500).json({ error: message });
     }
 }
 

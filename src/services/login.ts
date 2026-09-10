@@ -12,24 +12,6 @@ export async function deleteAccount() {
     return res.json();
 }
 
-export async function walletLogin(walletAddress: string, signature: string, message: string) {
-    try {
-        const res = await fetch(`${API_URL}/api/wallet-login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ walletAddress, signature, message }),
-        });
-        if (!res.ok) throw new Error("Wallet login failed");
-        const data = await res.json();
-        if (data.token) {
-            await AsyncStorage.setItem("token", data.token);
-        }
-        return data;
-    } catch (err) {
-        console.error("walletLogin error:", err);
-        throw err;
-    }
-}
 
 export async function Login(email: string, password: string) {
 
@@ -43,7 +25,8 @@ export async function Login(email: string, password: string) {
         });
 
     if (!res.ok) {
-            throw new Error("Failed to login");
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.error ?? "Failed to login");
         }
 
         const data = await res.json();

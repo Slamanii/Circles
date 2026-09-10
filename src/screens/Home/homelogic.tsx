@@ -1,7 +1,7 @@
-import { useNavigation } from "@react-navigation/native";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useCallback, useState } from "react";
 import { PreSave } from "../../services/eventService";
-import { getUser } from "../../services/user";
+import { getUser, updateProfile } from "../../services/user";
 
 // Stories row was moved to StoriesSearchScreen (Search tab).
 // homelogic only handles user identity + event interactions.
@@ -13,19 +13,30 @@ export function useHomeLogic() {
     const [username, setUsername] = useState<string>("");
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        async function load() {
-            try {
-                const data = await getUser();
-                setLocation(data.location || "Set location");
-                setUsername(data.username);
-            } catch (err) {
-                setError("Failed to load user data");
-                console.error(err);
+    useFocusEffect(
+        useCallback(() => {
+            async function load() {
+                try {
+                    const data = await getUser();
+                    setLocation(data.location || "");
+                    setUsername(data.username);
+                } catch (err) {
+                    setError("Failed to load user data");
+                    console.error(err);
+                }
             }
+            load();
+        }, [])
+    );
+
+    const updateLocation = async (city: string) => {
+        setLocation(city);
+        try {
+            await updateProfile({ location: city });
+        } catch (err) {
+            console.error("Failed to save location:", err);
         }
-        load();
-    }, []);
+    };
 
     const onChatPress = () => navigation.navigate("ChatListScreen");
 
@@ -49,6 +60,7 @@ export function useHomeLogic() {
         error,
         location,
         username,
+        updateLocation,
         onChatPress,
         handlePreSave,
         handleGetTicket,

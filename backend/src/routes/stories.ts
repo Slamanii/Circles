@@ -129,16 +129,17 @@ export async function fetchStoriesPreviewRouter(req: any, res: any) {
 
 export async function fetchStoryByUserRouter(req: any, res: any) {
 
-    try {     
+    try {
 
-    const userId = req.user.id;
+    const userId = (req.query.userId as string) || req.user.id;
 
     const result = await fetchStoryByUser(userId)
-    res.status(201).json(result)
+    res.status(200).json(result)
 
-    } catch (error) {
-        console.error(error)
-        res.status(500).json({error: "Failed to fetch story by user"})
+    } catch (error: any) {
+        const message = error?.message ?? "Failed to fetch story by user";
+        console.error("fetchStoryByUser error:", message);
+        res.status(500).json({ error: message });
     }
 }
 

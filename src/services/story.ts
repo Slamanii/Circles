@@ -6,7 +6,7 @@ async function authHeaders() {
     const token = await AsyncStorage.getItem("token");
     return {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
 }
 
@@ -131,7 +131,10 @@ export async function fetchStoryByUser(userId?: string) {
             method: "GET",
             headers: await authHeaders(),
         });
-        if (!res.ok) throw new Error("Failed to fetch story by user");
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.error ?? "Failed to fetch story by user");
+        }
         return await res.json();
     } catch (err) {
         console.error("fetchStoryByUser error:", err);

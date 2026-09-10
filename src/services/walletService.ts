@@ -46,10 +46,14 @@ export async function initiatePaystackPay(eventId: string, quantity: number) {
             headers: await authHeaders(),
             body: JSON.stringify({ eventId, quantity }),
         });
-        if (!res.ok) throw new Error("Failed to initiate paystack transaction");
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error((body as any).error ?? "Failed to initiate paystack transaction");
+        }
         return await res.json() as { checkoutUrl: string; reference: string; quantity: number };
     } catch (err) {
         console.error("initiatePaystackPay error:", err);
+        throw err;
     }
 }
 

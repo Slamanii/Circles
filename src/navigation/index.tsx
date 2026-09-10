@@ -174,8 +174,8 @@ function Tabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: "#E8622A",
-        tabBarInactiveTintColor: isDark ? "#888888" : "#9CA3AF",
-        tabBarShowLabel: false,
+        tabBarInactiveTintColor: isDark ? "#F0EEE9" : "#0A0A0A",
+        tabBarShowLabel: true,
         tabBarItemStyle: {
           justifyContent: "center",
           alignItems: "center",
@@ -226,12 +226,12 @@ const tabStyles = StyleSheet.create({
   bar: {
     position: "absolute",
     bottom: 20,
-    marginHorizontal: 20,
+    marginHorizontal: 50,
     borderRadius: 28,
     backgroundColor: "transparent",
     borderTopWidth: 0,
     elevation: 0,
-    height: 64,
+    height: 54,
     paddingBottom: 0,
     paddingTop: 0,
     shadowOffset: { width: 0, height: 8 },

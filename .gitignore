@@ -36,7 +36,7 @@ yarn-error.*
 .env*.local
 backend/.env
 backend/.env.*
-.treasury-keypair.json
+backend/treasury-keypair*.json
 
 # typescript
 *.tsbuildinfo
@@ -46,3 +46,9 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Rust build artifacts
+target/
+
+# Backend
+backend/node_modules/

@@ -1,5 +1,7 @@
 // Bottom padding so content clears the floating glass tab bar
-export const TAB_PAD = 90;
+export const TAB_PAD = 0;
+// Height of the floating glass tab bar itself
+export const TAB_BAR_HEIGHT = 42;
 
 export const Colors = {
     background: "#EDEDED",
@@ -25,6 +27,8 @@ export const Colors = {
 
     storyBorder: "#E8622A",
 };
+
+export type ThemeColors = typeof Colors;
 
 export function getColors(theme: "light" | "dark") {
     if (theme === "light") return Colors;
