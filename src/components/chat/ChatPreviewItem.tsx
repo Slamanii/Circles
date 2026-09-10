@@ -1,4 +1,5 @@
-import { View, Text, TouchableOpacity, Image } from "react-native"
+import { View, Text, TouchableOpacity } from "react-native"
+import { Image } from "expo-image"
 import { useAppTheme } from "../../context/ThemeContext"
 import { getColors } from "../../shared/theme"
 
@@ -9,6 +10,7 @@ export function ChatPreviewItem({
     image,
     pinned,
     muted,
+    unreadCount,
     onPress,
     onLongPress,
 }: any) {
@@ -64,6 +66,25 @@ export function ChatPreviewItem({
                     <Text style={{ marginTop: 4 }}>
                         📌
                     </Text>
+                )}
+
+                {unreadCount > 0 && (
+                    <View
+                        style={{
+                            marginTop: 4,
+                            minWidth: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            paddingHorizontal: 6,
+                            backgroundColor: C.accent,
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                        </Text>
+                    </View>
                 )}
             </View>
         </TouchableOpacity>

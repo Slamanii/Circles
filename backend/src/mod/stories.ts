@@ -30,7 +30,7 @@ export async function createStory({
         position: i + 1,
     }));
 
-    const { error: itemsError } = await supabase.from("storyitems").insert(items);
+    const { error: itemsError } = await supabase.from("story_items").insert(items);
     if (itemsError) throw itemsError;
 
     await supabase
@@ -50,7 +50,7 @@ export async function viewStory({
 }) {
 
     const { error } = await supabase
-        .from('storyViews')
+        .from('story_views')
         .insert({
             story_item_id: storyItemId,
             viewer_id: viewerId,
@@ -72,7 +72,7 @@ export async function likeStory({
 }) {
 
     const { error } = await supabase
-        .from("storyLikes")
+        .from("story_likes")
         .insert({
             story_item_id: storyItemId,
             user_id: userId,
@@ -94,7 +94,7 @@ export async function unlikeStory({
 }) {
 
     const { error } = await supabase
-        .from("storyLikes")
+        .from("story_likes")
         .delete()
         .eq("story_item_id", storyItemId)
         .eq("user_id", userId);
@@ -108,7 +108,7 @@ export async function unlikeStory({
 export async function deleteSubStory(subStoryId: string, userId: string) {
 
     const { data: substory } = await supabase
-        .from("storyitems")
+        .from("story_items")
         .select("id, stories!inner(user_id)")
         .eq("id", subStoryId)
         .single();
@@ -118,12 +118,12 @@ export async function deleteSubStory(subStoryId: string, userId: string) {
     }
 
     await supabase
-        .from("storyViews")
+        .from("story_views")
         .delete()
         .eq("story_item_id", subStoryId);
 
     const { error } = await supabase
-        .from("storyitems")
+        .from("story_items")
         .delete()
         .eq("id", subStoryId);
 
@@ -144,16 +144,16 @@ export async function deleteStory(storyId: string, userId: string) {
     }
 
     const { data: subs } = await supabase
-        .from("storyitems")
+        .from("story_items")
         .select("id")
         .eq("story_id", storyId);
 
     const subIds = subs?.map(s => s.id) ?? [];
 
-    await supabase.from("storylikes").delete().in("story_item_id", subIds);
-    await supabase.from("storyViews").delete().in("story_item_id", subIds);
+    await supabase.from("story_likes").delete().in("story_item_id", subIds);
+    await supabase.from("story_views").delete().in("story_item_id", subIds);
 
-    await supabase.from("storyitems").delete().eq("story_id", storyId);
+    await supabase.from("story_items").delete().eq("story_id", storyId);
 
 
     await supabase.from("stories").delete().eq("id", storyId);
@@ -179,7 +179,7 @@ export async function fetchStories(userId: string) {
       user_id,
       created_at,
       users (username, avatar),
-      storyitems (
+      story_items (
         id,
         media_url,
         caption,
@@ -195,18 +195,7 @@ export async function fetchStories(userId: string) {
 }
 
 
-export async function fetchStoriesPreview(userId: string) {
-
-    const { data: follows, error: followsError } = await supabase
-    .from("follows")
-    .select("following_id")
-    .eq("follower_id", userId);
-
-  if (followsError) throw followsError;
-
-  const followingIds = follows?.map((f) => f.following_id) ?? [];
-
-  if (followingIds.length === 0) return [];
+export async function fetchStoriesPreview(userId: string, limit: number = 400) {
 
   const { data, error } = await supabase
     .from("stories")
@@ -214,19 +203,28 @@ export async function fetchStoriesPreview(userId: string) {
       id,
       user_id,
       users (username, avatar),
-      storyitems (
+      story_items (
         id,
         media_url,
         created_at
       )
     `)
-    .in("user_id", followingIds)
+    .neq("user_id", userId)
     .order("created_at", { ascending: false })
-    .limit(1);
+    .limit(limit);
 
   if (error) throw error;
 
-  return data;
+  // One preview per user (their most recent story), across followed and discover alike
+  const seenUsers = new Set<string>();
+  const preview: typeof data = [];
+  for (const story of data ?? []) {
+    if (seenUsers.has(story.user_id)) continue;
+    seenUsers.add(story.user_id);
+    preview.push(story);
+  }
+
+  return preview;
 }
 
 export async function fetchDiscoverStories(currentUserId: string, limit: number = 400) {
@@ -266,7 +264,7 @@ export async function fetchStoryByUser(userId: string) {
   const storyIds = stories.map(s => s.id);
 
   const { data: items, error: itemsError } = await supabase
-    .from("storyitems")
+    .from("story_items")
     .select("id, story_id, media_url, caption, media_type, created_at")
     .in("story_id", storyIds)
     .order("created_at", { ascending: true });
@@ -275,8 +273,33 @@ export async function fetchStoryByUser(userId: string) {
 
   return stories.map(s => ({
     ...s,
-    storyitems: items?.filter(i => i.story_id === s.id) ?? [],
+    story_items: items?.filter(i => i.story_id === s.id) ?? [],
   }));
+}
+
+export async function fetchStoryById(storyId: string) {
+  const { data, error } = await supabase
+    .from("stories")
+    .select(`
+      id,
+      user_id,
+      created_at,
+      preview_media_snapshot,
+      users (username, avatar),
+      story_items (
+        id,
+        media_url,
+        caption,
+        media_type,
+        created_at
+      )
+    `)
+    .eq("id", storyId)
+    .single();
+
+  if (error) throw error;
+
+  return data;
 }
 
 export async function fetchStoryViews(subStoryId: string) {
@@ -285,9 +308,9 @@ export async function fetchStoryViews(subStoryId: string) {
     .from("story_views")
     .select(`
       viewer_id,
-      profiles (username, avatar_url)
+      users (username, avatar)
     `)
-    .eq("substory_id", subStoryId);
+    .eq("story_item_id", subStoryId);
 
   if (error) throw error;
 
@@ -301,9 +324,9 @@ export async function fetchStoryLikes(subStoryId: string) {
     .from("story_likes")
     .select(`
       user_id,
-      profiles (username, avatar_url)
+      users (username, avatar)
     `)
-    .eq("substory_id", subStoryId);
+    .eq("story_item_id", subStoryId);
 
   if (error) throw error;
 

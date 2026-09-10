@@ -1,4 +1,5 @@
-import { Image, Text, TouchableOpacity, View } from "react-native";
+import { Image } from "expo-image";
+import { Text, TouchableOpacity, View } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 

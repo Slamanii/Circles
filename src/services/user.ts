@@ -1,103 +1,99 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { EventStats, RawEventSummary } from "../../shared/Types";
+import { api } from "./apiClient";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+export type UserSummary = { id: string; username: string; display_name?: string; avatar?: string | null; verified?: boolean };
 
-async function authHeaders() {
-    const token = await AsyncStorage.getItem("token");
-    return {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-    };
-}
+type UserProfile = {
+    id: string;
+    username: string;
+    display_name?: string;
+    bio?: string | null;
+    link_1?: string | null;
+    link_2?: string | null;
+    location?: string | null;
+    avatar?: string | null;
+    verified?: boolean;
+    private?: boolean;
+    followers?: number;
+    following?: number;
+    canViewContent: boolean;
+};
+
+export type FollowRow = {
+    follower_id?: string;
+    following_id?: string;
+    users?: UserSummary | null;
+    isFollowing: boolean;
+};
 
 export async function searchUsers(query: string) {
-    const res = await fetch(`${API_URL}/api/search-users?q=${encodeURIComponent(query)}`, {
-        headers: await authHeaders(),
-    });
-    if (!res.ok) throw new Error("Search failed");
-    return await res.json();
+    return api.get<UserSummary[]>(`/api/search-users?q=${encodeURIComponent(query)}`, "Search failed");
 }
 
 export async function getUser() {
-    const res = await fetch(`${API_URL}/api/get-user`, {
-        headers: await authHeaders(),
-    });
-    if (!res.ok) throw new Error("Failed to fetch user");
-    return await res.json();
+    return api.get<UserProfile>("/api/get-user", "Failed to fetch user");
 }
 
 export async function getUserProfile(id?: string) {
     const url = id
-        ? `${API_URL}/api/get-user-profile?id=${encodeURIComponent(id)}`
-        : `${API_URL}/api/get-user`;
-    const res = await fetch(url, { headers: await authHeaders() });
-    if (!res.ok) throw new Error("Failed to fetch user profile");
-    return await res.json();
+        ? `/api/get-user-profile?id=${encodeURIComponent(id)}`
+        : `/api/get-user`;
+    return api.get<UserProfile>(url, "Failed to fetch user profile");
 }
 
-export async function fetchFollowers() {
+export async function fetchFollowers(userId?: string, limit?: number, offset?: number) {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-followers`, {
-            method: "POST",
-            headers: await authHeaders(),
-        });
-        if (!res.ok) throw new Error("Failed to load followers");
-        return await res.json();
+        return await api.post<FollowRow[]>("/api/fetch-followers", { userId, limit, offset }, "Failed to load followers");
     } catch (err) {
         console.error("fetchFollowers error:", err);
+        throw err;
     }
 }
 
-export async function fetchFollowing() {
+export async function fetchFollowing(userId?: string, limit?: number, offset?: number) {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-following`, {
-            method: "POST",
-            headers: await authHeaders(),
-        });
-        if (!res.ok) throw new Error("Failed to load following");
-        return await res.json();
+        return await api.post<FollowRow[]>("/api/fetch-following", { userId, limit, offset }, "Failed to load following");
     } catch (err) {
         console.error("fetchFollowing error:", err);
+        throw err;
+    }
+}
+
+export async function fetchEventStats(eventId: string) {
+    try {
+        return await api.get<EventStats>(`/api/event-stats?eventId=${encodeURIComponent(eventId)}`, "Failed to load event stats");
+    } catch (err) {
+        console.error("fetchEventStats error:", err);
+        throw err;
     }
 }
 
 export async function fetchHostedEvents(userId?: string) {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-hosted-events`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: userId ? JSON.stringify({ userId }) : undefined,
-        });
-        if (!res.ok) throw new Error("Failed to load hosted events");
-        return await res.json();
+        return await api.post<RawEventSummary[]>("/api/fetch-hosted-events", userId ? { userId } : undefined, "Failed to load hosted events");
     } catch (err) {
         console.error("fetchHostedEvents error:", err);
+        throw err;
     }
 }
 
 export async function fetchLikedEvents() {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-liked-events`, {
-            headers: await authHeaders(),
-        });
-        if (!res.ok) throw new Error("Failed to load liked events");
-        return await res.json();
+        return await api.get<RawEventSummary[]>("/api/fetch-liked-events", "Failed to load liked events");
     } catch (err) {
         console.error("fetchLikedEvents error:", err);
+        throw err;
     }
 }
 
 export async function fetchEventLikes(eventId: string) {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-event-likes`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify({ eventId }),
-        });
-        if (!res.ok) throw new Error("Failed to load event likes");
-        return await res.json();
+        return await api.post<{ likedByUser: boolean; count: number }>(
+            "/api/fetch-event-likes", { eventId }, "Failed to load event likes"
+        );
     } catch (err) {
         console.error("fetchEventLikes error:", err);
+        throw err;
     }
 }
 
@@ -110,25 +106,23 @@ export async function updateProfile(data: {
     avatar?: string;
     private?: boolean;
 }) {
-    const res = await fetch(`${API_URL}/api/update-profile`, {
-        method: "PUT",
-        headers: await authHeaders(),
-        body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error("Failed to update profile");
-    return await res.json();
+    return api.put("/api/update-profile", data, "Failed to update profile");
 }
 
-export async function followUser(followingData: string) {
+export async function followUser(followingId: string) {
     try {
-        const res = await fetch(`${API_URL}/api/follow-user`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify(followingData),
-        });
-        if (!res.ok) throw new Error("Failed to follow user");
-        return await res.json();
+        return await api.post("/api/follow-user", { followingId }, "Failed to follow user");
     } catch (err) {
         console.error("followUser error:", err);
+        throw err;
+    }
+}
+
+export async function unfollowUser(followingId: string) {
+    try {
+        return await api.post("/api/unfollow-user", { followingId }, "Failed to unfollow user");
+    } catch (err) {
+        console.error("unfollowUser error:", err);
+        throw err;
     }
 }

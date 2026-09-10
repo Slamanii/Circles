@@ -13,15 +13,23 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import PasswordPromptModal from "../../../components/PasswordPromptModal";
 import { WalletTokenRow } from "../../../components/wallet/WalletTokenRow";
 import { useMobileWallet } from "../../../hooks/useMobileWallet";
+import { useStepUp } from "../../../hooks/useStepUp";
+import { CUSTODIAL } from "../../../hooks/useWalletConnection";
+import { makeCustodialSigner } from "../../../services/wallet/custodialSign";
 import { buildSwapTx, getSwapQuote } from "../../../services/wallet/swap/swapService";
 import { Token } from "../../../../shared/Types";
 
 export default function SwapScreen({ route }: any) {
-    const { tokens, walletAddress } = route.params ?? {};
+    const { tokens, walletAddress, activeWallet } = route.params ?? {};
     const navigation = useNavigation<any>();
     const { account, signAndSendTransaction } = useMobileWallet() as any;
+    const { requestStepUp, promptProps } = useStepUp();
+
+    const isCustodial = activeWallet === CUSTODIAL;
+    const canExecute = isCustodial || !!account;
 
     const [fromToken, setFromToken] = useState<Token | null>(null);
     const [toToken,   setToToken]   = useState<Token | null>(null);
@@ -30,7 +38,7 @@ export default function SwapScreen({ route }: any) {
     const [loading,   setLoading]    = useState(false);
     const [pickerOpen, setPickerOpen] = useState(false);
 
-    const effectiveAddress = account?.address?.toBase58() ?? walletAddress;
+    const effectiveAddress = isCustodial ? walletAddress : (account?.address?.toBase58() ?? walletAddress);
 
     // ── Step 1: pick FROM token ───────────────────────────────────────────────
     if (!fromToken) {
@@ -62,8 +70,8 @@ export default function SwapScreen({ route }: any) {
         try {
             const q = await getSwapQuote(fromToken.id, toToken.id, parseFloat(amount), fromToken.decimals);
             setQuote(q);
-        } catch (err: any) {
-            Alert.alert("Quote failed", err.message);
+        } catch (err) {
+            Alert.alert("Quote failed", err instanceof Error ? err.message : "Unknown error");
         } finally {
             setLoading(false);
         }
@@ -71,7 +79,7 @@ export default function SwapScreen({ route }: any) {
 
     const handleConfirm = async () => {
         if (!quote || !effectiveAddress) return;
-        if (!account) {
+        if (!canExecute) {
             Alert.alert("Phantom required", "Connect your Phantom wallet to execute swaps.");
             return;
         }
@@ -82,11 +90,12 @@ export default function SwapScreen({ route }: any) {
             const { VersionedTransaction } = await import("@solana/web3.js");
             const txBytes = Buffer.from(swapTxBase64, "base64");
             const tx = VersionedTransaction.deserialize(txBytes);
-            await signAndSendTransaction(tx);
+            const signer = isCustodial ? makeCustodialSigner(requestStepUp) : signAndSendTransaction;
+            await signer(tx);
             Alert.alert("Swap submitted", "Transaction sent successfully.");
             navigation.goBack();
-        } catch (err: any) {
-            Alert.alert("Swap failed", err.message);
+        } catch (err) {
+            Alert.alert("Swap failed", err instanceof Error ? err.message : "Unknown error");
         } finally {
             setLoading(false);
         }
@@ -164,12 +173,14 @@ export default function SwapScreen({ route }: any) {
                     </TouchableOpacity>
                 )}
 
-                {!account && (
+                {!canExecute && (
                     <Text style={styles.walletNote}>
                         Swap execution requires Phantom. Quotes are available for all wallets.
                     </Text>
                 )}
             </ScrollView>
+
+            <PasswordPromptModal {...promptProps} />
 
             {/* TO token picker */}
             <Modal visible={pickerOpen} transparent animationType="slide" onRequestClose={() => setPickerOpen(false)}>

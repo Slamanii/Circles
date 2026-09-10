@@ -1,12 +1,14 @@
 import { createStory, viewStory, unlikeStory, likeStory, deleteSubStory, deleteStory, fetchStories,
-         fetchStoriesPreview, fetchStoryByUser, fetchStoryViews, fetchStoryLikes, fetchDiscoverStories }
+         fetchStoriesPreview, fetchStoryByUser, fetchStoryById, fetchStoryViews, fetchStoryLikes, fetchDiscoverStories }
     from "../mod/stories"
+import { AuthRequest } from "../mod/auth"
+import { Response } from "express"
 
-export async function createStoryRouter(req: any, res: any) {
+export async function createStoryRouter(req: AuthRequest, res: Response) {
 
     try {     
      
-    const userId = req.user.id;
+    const userId = req.user!.id;
     const storyData = req.body;
 
     const result = await createStory({ userId, ...storyData })
@@ -18,11 +20,11 @@ export async function createStoryRouter(req: any, res: any) {
     }
 }
 
-export async function viewStoryRouter(req: any, res: any) {
+export async function viewStoryRouter(req: AuthRequest, res: Response) {
 
     try {     
      
-    const viewerId = req.user.id;
+    const viewerId = req.user!.id;
     const storyData = req.body;
 
     const result = await viewStory({ viewerId, ...storyData })
@@ -34,11 +36,11 @@ export async function viewStoryRouter(req: any, res: any) {
     }
 }
 
-export async function unlikeStoryRouter(req: any, res: any) {
+export async function unlikeStoryRouter(req: AuthRequest, res: Response) {
 
     try {     
      
-    const userId = req.user.id;
+    const userId = req.user!.id;
     const storyData = req.body;
 
     const result = await unlikeStory({ userId, ...storyData })
@@ -50,11 +52,11 @@ export async function unlikeStoryRouter(req: any, res: any) {
     }
 }
 
-export async function likeStoryRouter(req: any, res: any) {
+export async function likeStoryRouter(req: AuthRequest, res: Response) {
 
     try {     
      
-    const userId = req.user.id;
+    const userId = req.user!.id;
     const storyData = req.body;
 
     const result = await likeStory({ userId, ...storyData })
@@ -66,14 +68,14 @@ export async function likeStoryRouter(req: any, res: any) {
     }
 }
 
-export async function deleteSubStoryRouter(req: any, res: any) {
+export async function deleteSubStoryRouter(req: AuthRequest, res: Response) {
 
     try {     
      
-    const userId = req.user.id;
+    const userId = req.user!.id;
     const { deleteStoryData } = req.body;
 
-    const result = await deleteSubStory(userId, deleteStoryData)
+    const result = await deleteSubStory(deleteStoryData, userId)
     res.status(201).json(result)
 
     } catch (error) {
@@ -82,14 +84,14 @@ export async function deleteSubStoryRouter(req: any, res: any) {
     }
 }
 
-export async function deleteStoryRouter(req: any, res: any) {
+export async function deleteStoryRouter(req: AuthRequest, res: Response) {
 
     try {     
      
-    const userId = req.user.id;
+    const userId = req.user!.id;
     const { deleteStoryData } = req.body;
 
-    const result = await deleteStory(userId, deleteStoryData)
+    const result = await deleteStory(deleteStoryData, userId)
     res.status(201).json(result)
 
     } catch (error) {
@@ -98,10 +100,10 @@ export async function deleteStoryRouter(req: any, res: any) {
     }
 }
 
-export async function fetchStoriesRouter(req: any, res: any) {
+export async function fetchStoriesRouter(req: AuthRequest, res: Response) {
 
     try {     
-    const userId = req.user.id;
+    const userId = req.user!.id;
 
     const result = await fetchStories(userId)
     res.status(201).json(result)
@@ -113,10 +115,10 @@ export async function fetchStoriesRouter(req: any, res: any) {
 }
 
 
-export async function fetchStoriesPreviewRouter(req: any, res: any) {
+export async function fetchStoriesPreviewRouter(req: AuthRequest, res: Response) {
 
     try {     
-    const userId = req.user.id;
+    const userId = req.user!.id;
     
     const result = await fetchStoriesPreview(userId)
     res.status(201).json(result)
@@ -127,25 +129,37 @@ export async function fetchStoriesPreviewRouter(req: any, res: any) {
     }
 }
 
-export async function fetchStoryByUserRouter(req: any, res: any) {
+export async function fetchStoryByUserRouter(req: AuthRequest, res: Response) {
 
     try {
 
-    const userId = (req.query.userId as string) || req.user.id;
+    const userId = (req.query.userId as string) || req.user!.id;
 
     const result = await fetchStoryByUser(userId)
     res.status(200).json(result)
 
-    } catch (error: any) {
-        const message = error?.message ?? "Failed to fetch story by user";
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to fetch story by user";
         console.error("fetchStoryByUser error:", message);
         res.status(500).json({ error: message });
     }
 }
 
-export async function fetchDiscoverStoriesRouter(req: any, res: any) {
+export async function fetchStoryByIdRouter(req: AuthRequest, res: Response) {
     try {
-        const userId = req.user.id;
+        const { storyId } = req.query;
+        const result = await fetchStoryById(storyId as string);
+        res.status(200).json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to fetch story";
+        console.error("fetchStoryById error:", message);
+        res.status(500).json({ error: message });
+    }
+}
+
+export async function fetchDiscoverStoriesRouter(req: AuthRequest, res: Response) {
+    try {
+        const userId = req.user!.id;
         const result = await fetchDiscoverStories(userId, 400);
         res.status(200).json(result);
     } catch (error) {
@@ -154,12 +168,12 @@ export async function fetchDiscoverStoriesRouter(req: any, res: any) {
     }
 }
 
-export async function fetchStoryViewsRouter(req: any, res: any) {
+export async function fetchStoryViewsRouter(req: AuthRequest, res: Response) {
   try {
 
-    const { subStoryId } = req.params;
+    const { subStoryId } = req.query;
 
-    const result = await fetchStoryViews(subStoryId);
+    const result = await fetchStoryViews(subStoryId as string);
 
     res.status(200).json(result);
 
@@ -169,10 +183,10 @@ export async function fetchStoryViewsRouter(req: any, res: any) {
   }
 }
 
-export async function fetchStoryLikesRouter(req: any, res: any) {
+export async function fetchStoryLikesRouter(req: AuthRequest, res: Response) {
   try {
 
-    const { subStoryId } = req.params;
+    const { subStoryId } = req.body;
 
     const result = await fetchStoryLikes(subStoryId);
 

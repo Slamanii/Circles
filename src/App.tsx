@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createNavigationContainerRef, NavigationContainer } from "@react-navigation/native";
+import { getToken, setToken } from "./services/secureStorage";
 import { MobileWalletProvider } from "@wallet-ui/react-native-web3js";
 import { useEffect, useState } from "react";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -30,8 +31,8 @@ export default function App() {
     const [authStep,        setAuthStep]        = useState<AuthStep>("welcome");
 
     useEffect(() => {
-        AsyncStorage.multiGet(["token", "user"])
-            .then(([[, token], [, userRaw]]) => {
+        Promise.all([getToken(), AsyncStorage.getItem("user")])
+            .then(([token, userRaw]) => {
                 if (token && userRaw) {
                     const user = JSON.parse(userRaw);
                     setAuthenticated(true);
@@ -43,7 +44,7 @@ export default function App() {
     }, []);
 
     const handleLogin = async (user: any, token: string) => {
-        await AsyncStorage.setItem("token", token);
+        await setToken(token);
         await AsyncStorage.setItem("user", JSON.stringify(user));
         setAuthenticated(true);
         setUserId(user.id);

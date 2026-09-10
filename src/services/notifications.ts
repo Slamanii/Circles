@@ -1,16 +1,7 @@
 import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "./supabase";
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
-async function authHeaders() {
-    const token = await AsyncStorage.getItem("token");
-    return {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-    };
-}
+import { api } from "./apiClient";
 
 export type AppNotification = {
     id: string;
@@ -26,21 +17,15 @@ export type AppNotification = {
 };
 
 export async function fetchNotifications(limit = 30, offset = 0): Promise<AppNotification[]> {
-    const res = await fetch(
-        `${API_URL}/api/notifications?limit=${limit}&offset=${offset}`,
-        { headers: await authHeaders() },
+    const json = await api.get<{ notifications: AppNotification[] }>(
+        `/api/notifications?limit=${limit}&offset=${offset}`,
+        "Failed to fetch notifications",
     );
-    if (!res.ok) throw new Error("Failed to fetch notifications");
-    const json = await res.json();
-    return json.notifications as AppNotification[];
+    return json.notifications;
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
-    const res = await fetch(`${API_URL}/api/mark-notification-read`, {
-        method: "POST",
-        headers: await authHeaders(),
-    });
-    if (!res.ok) throw new Error("Failed to mark notifications read");
+    await api.post("/api/mark-notification-read", undefined, "Failed to mark notifications read");
 }
 
 export function subscribeToNotifications(userId: string) {
@@ -55,7 +40,7 @@ export function subscribeToNotifications(userId: string) {
                 filter: `user_id=eq.${userId}`,
             },
             (payload) => {
-                const n = payload.new as any;
+                const n = payload.new as AppNotification;
                 Notifications.scheduleNotificationAsync({
                     content: {
                         title: n.title ?? "Fuego",
@@ -78,8 +63,10 @@ export async function registerForPushNotifications(): Promise<string | null> {
     const tokenData = await Notifications.getExpoPushTokenAsync();
     const pushToken = tokenData.data;
 
-    // Persist so the backend can send targeted push notifications
     await AsyncStorage.setItem("push_token", pushToken);
+
+    // Send to the backend so server-initiated push can target this device
+    await api.post("/api/save-push-token", { token: pushToken }, "Failed to save push token").catch(console.error);
 
     return pushToken;
 }

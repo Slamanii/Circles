@@ -1,4 +1,4 @@
-import DateTimePicker from "@react-native-community/datetimepicker";
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import {
@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { useAppTheme } from "../context/ThemeContext";
 import { DateRange, PriceRange } from "../hooks/useEventFilter";
-import { Colors, getColors, Radius } from "../shared/theme";
+import { Colors, getColors, Radius, ThemeColors } from "../shared/theme";
 
 export type FilterSheetType = "date" | "price" | "location";
 
@@ -107,7 +107,7 @@ export default function FilterSheet({
 // ─── Date content ────────────────────────────────────────────────────────────
 
 function DateContent({ C, dateRange, onDateChange }: {
-    C: any;
+    C: ThemeColors;
     dateRange: DateRange;
     onDateChange: (r: DateRange) => void;
 }) {
@@ -115,7 +115,7 @@ function DateContent({ C, dateRange, onDateChange }: {
 
     const showAndroidPicker = (field: "from" | "to") => setPicking(field);
 
-    const handleChange = (_: any, date?: Date) => {
+    const handleChange = (_: DateTimePickerEvent, date?: Date) => {
         if (!date || !picking) return;
         onDateChange(
             picking === "from"
@@ -188,7 +188,7 @@ function DateContent({ C, dateRange, onDateChange }: {
 }
 
 function DateRow({ label, value, C, onPress, active }: {
-    label: string; value: string; C: any; onPress: () => void; active: boolean;
+    label: string; value: string; C: ThemeColors; onPress: () => void; active: boolean;
 }) {
     return (
         <TouchableOpacity
@@ -206,7 +206,7 @@ function DateRow({ label, value, C, onPress, active }: {
 // ─── Price content ────────────────────────────────────────────────────────────
 
 function PriceContent({ C, priceRange, onPriceChange, onApply }: {
-    C: any;
+    C: ThemeColors;
     priceRange: PriceRange;
     onPriceChange: (r: PriceRange) => void;
     onApply: () => void;
@@ -273,7 +273,7 @@ function PriceContent({ C, priceRange, onPriceChange, onApply }: {
 // ─── Location content ─────────────────────────────────────────────────────────
 
 function LocationContent({ C, locations, selectedLocation, onSelect }: {
-    C: any;
+    C: ThemeColors;
     locations: string[];
     selectedLocation: string | null;
     onSelect: (loc: string | null) => void;

@@ -5,11 +5,11 @@ import { Alert, KeyboardAvoidingView, Platform, Share, StyleSheet, View } from "
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 
-import { Message } from "../../../shared/Types";
+import { Message, RawGroupMember, RawMessage } from "../../../shared/Types";
 import { ChatHeader } from "../../components/chat/ChatHeader";
 import { MessageInput } from "../../components/chat/MessageInput";
 import { MessageList } from "../../components/chat/MessageList";
-import { fetchMessages, sendMessage, deleteMessage, pinMessage, starMessage, unstarMessage, fetchStarredIds } from "../../services/chatService";
+import { fetchMessages, sendMessage, deleteMessage, pinMessage, starMessage, unstarMessage, fetchStarredIds, markAsRead, getGroup } from "../../services/chatService";
 import { subscribeToNotifications } from "../../services/notifications";
 import { uploadMedia } from "../../services/upload";
 import { supabase } from "../../services/supabase";
@@ -25,16 +25,16 @@ export function ChatScreen({ route, navigation }: any) {
     const [input, setInput] = useState("");
     const [recording, setRecording] = useState(false);
     const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-    const [members, setMembers] = useState<any[]>([]);
+    const [members, setMembers] = useState<RawGroupMember[]>([]);
     const userIdRef = useRef<string | null>(null);
-    const notifChannelRef = useRef<any>(null);
+    const notifChannelRef = useRef<ReturnType<typeof subscribeToNotifications> | null>(null);
     const recorderRef = useRef<Audio.Recording | null>(null);
 
     useEffect(() => {
-        const mapMessage = (m: any, myId: string | null, starredIds: Set<string>): Message => ({
+        const mapMessage = (m: RawMessage, myId: string | null, starredIds: Set<string>): Message => ({
             id: m.id,
             senderId: m.sender_id,
-            senderName: m.senderName ?? m.users?.username ?? "Unknown",
+            senderName: m.senderName ?? "Unknown",
             content: m.content,
             type: m.type ?? "text",
             media: m.media ?? undefined,
@@ -62,7 +62,7 @@ export function ChatScreen({ route, navigation }: any) {
                 table: "messages",
                 filter: `group_id=eq.${groupId}`,
             }, (payload) => {
-                setMessages(prev => [...prev, mapMessage(payload.new, userIdRef.current, new Set())]);
+                setMessages(prev => [...prev, mapMessage(payload.new as RawMessage, userIdRef.current, new Set())]);
             })
             .subscribe();
 
@@ -77,13 +77,14 @@ export function ChatScreen({ route, navigation }: any) {
                 const [msgData, starredIds] = await Promise.all([
                     fetchMessages(groupId),
                     fetchStarredIds(groupId),
+                    markAsRead(groupId).catch(() => {}),
                 ]);
                 const starredSet = new Set(starredIds);
-                setMessages((msgData.messages ?? []).reverse().map((m: any) => mapMessage(m, userIdRef.current, starredSet)));
+                setMessages((msgData.messages ?? []).reverse().map((m) => mapMessage(m, userIdRef.current, starredSet)));
 
                 // load group members for @mention
-                const { data: groupData } = await (await import("../../services/chatService")).getGroup(groupId) as any;
-                if (groupData?.group?.group_members) setMembers(groupData.group.group_members);
+                const groupData = await getGroup(groupId);
+                if (groupData.group.group_members) setMembers(groupData.group.group_members);
             } catch (err) {
                 console.error("Failed to load messages", err);
             }

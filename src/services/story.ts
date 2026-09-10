@@ -1,12 +1,22 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { NormalizedStory, RawStory, RawStoryLike, RawStoryView } from "../../shared/Types";
+import { api } from "./apiClient";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
-async function authHeaders() {
-    const token = await AsyncStorage.getItem("token");
+function normalizeStory(raw: RawStory | null | undefined): NormalizedStory | null | undefined {
+    if (!raw) return raw;
     return {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        storyId: raw.id,
+        userId: raw.user_id,
+        userName: raw.users?.username,
+        avatar: raw.users?.avatar,
+        previewMediaSnapshot: raw.preview_media_snapshot,
+        createdAt: raw.created_at,
+        subStories: (raw.story_items ?? []).map((item) => ({
+            subId: item.id,
+            mediaUrl: item.media_url,
+            caption: item.caption,
+            mediaType: item.media_type,
+            createdAt: item.created_at,
+        })),
     };
 }
 
@@ -14,169 +24,131 @@ export async function createStory(storyData: {
     mediaFiles: { mediaUrl: string; type: "image" | "video"; caption?: string }[];
 }) {
     try {
-        const res = await fetch(`${API_URL}/api/create-story`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify(storyData),
-        });
-        if (!res.ok) throw new Error("Failed to create story");
-        return await res.json();
+        return await api.post("/api/create-story", storyData, "Failed to create story");
     } catch (err) {
         console.error("createStory error:", err);
+        throw err;
     }
 }
 
-export async function viewStory(storyData: any) {
+export async function viewStory(storyData: { storyItemId: string }) {
     try {
-        const res = await fetch(`${API_URL}/api/view-story`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify(storyData),
-        });
-        if (!res.ok) throw new Error("Failed to view story");
-        return await res.json();
+        return await api.post("/api/view-story", storyData, "Failed to view story");
     } catch (err) {
         console.error("viewStory error:", err);
+        throw err;
     }
 }
 
-export async function unlikeStory(storyData: any) {
+export async function unlikeStory(storyData: { storyItemId: string }) {
     try {
-        const res = await fetch(`${API_URL}/api/unlike-story`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify(storyData),
-        });
-        if (!res.ok) throw new Error("Failed to unlike story");
-        return await res.json();
+        return await api.post("/api/unlike-story", storyData, "Failed to unlike story");
     } catch (err) {
         console.error("unlikeStory error:", err);
+        throw err;
     }
 }
 
-export async function likeStory(storyData: any) {
+export async function likeStory(storyData: { storyItemId: string }) {
     try {
-        const res = await fetch(`${API_URL}/api/like-story`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify(storyData),
-        });
-        if (!res.ok) throw new Error("Failed to like story");
-        return await res.json();
+        return await api.post("/api/like-story", storyData, "Failed to like story");
     } catch (err) {
         console.error("likeStory error:", err);
+        throw err;
     }
 }
 
-export async function deleteSubStory(deleteStoryData: any) {
+export async function deleteSubStory(deleteStoryData: string) {
     try {
-        const res = await fetch(`${API_URL}/api/delete-substory`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify({ deleteStoryData }),
-        });
-        if (!res.ok) throw new Error("Failed to delete sub story");
-        return await res.json();
+        return await api.post("/api/delete-substory", { deleteStoryData }, "Failed to delete sub story");
     } catch (err) {
         console.error("deleteSubStory error:", err);
+        throw err;
     }
 }
 
-export async function deleteStory(deleteStoryData: any) {
+export async function deleteStory(deleteStoryData: string) {
     try {
-        const res = await fetch(`${API_URL}/api/delete-story`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify({ deleteStoryData }),
-        });
-        if (!res.ok) throw new Error("Failed to delete story");
-        return await res.json();
+        return await api.post("/api/delete-story", { deleteStoryData }, "Failed to delete story");
     } catch (err) {
         console.error("deleteStory error:", err);
+        throw err;
     }
 }
 
 export async function fetchStories() {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-stories`, {
-            method: "GET",
-            headers: await authHeaders(),
-        });
-        if (!res.ok) throw new Error("Failed to fetch stories");
-        return await res.json();
+        const data = await api.get<RawStory[]>("/api/fetch-stories", "Failed to fetch stories");
+        return (data ?? []).map(normalizeStory);
     } catch (err) {
         console.error("fetchStories error:", err);
+        throw err;
     }
 }
 
 export async function fetchStoriesPreview() {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-storiespreview`, {
-            method: "GET",
-            headers: await authHeaders(),
-        });
-        if (!res.ok) throw new Error("Failed to fetch stories preview");
-        return await res.json();
+        const data = await api.get<RawStory[]>("/api/fetch-storiespreview", "Failed to fetch stories preview");
+        return (data ?? []).map(normalizeStory);
     } catch (err) {
         console.error("fetchStoriesPreview error:", err);
+        throw err;
     }
 }
 
 export async function fetchStoryByUser(userId?: string) {
     try {
         const url = userId
-            ? `${API_URL}/api/fetch-stories-by-user?userId=${userId}`
-            : `${API_URL}/api/fetch-stories-by-user`;
-        const res = await fetch(url, {
-            method: "GET",
-            headers: await authHeaders(),
-        });
-        if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(body.error ?? "Failed to fetch story by user");
-        }
-        return await res.json();
+            ? `/api/fetch-stories-by-user?userId=${userId}`
+            : `/api/fetch-stories-by-user`;
+        const data = await api.get<RawStory[]>(url, "Failed to fetch story by user");
+        return (data ?? []).map(normalizeStory);
     } catch (err) {
         console.error("fetchStoryByUser error:", err);
+        throw err;
+    }
+}
+
+export async function fetchStoryById(storyId: string) {
+    try {
+        const data = await api.get<RawStory>(
+            `/api/fetch-story-by-id?storyId=${encodeURIComponent(storyId)}`,
+            "Failed to fetch story",
+        );
+        return normalizeStory(data);
+    } catch (err) {
+        console.error("fetchStoryById error:", err);
+        throw err;
     }
 }
 
 export async function fetchDiscoverStories() {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-discover-stories`, {
-            method: "GET",
-            headers: await authHeaders(),
-        });
-        if (!res.ok) throw new Error("Failed to fetch discover stories");
-        return await res.json();
+        const data = await api.get<RawStory[]>("/api/fetch-discover-stories", "Failed to fetch discover stories");
+        return (data ?? []).map(normalizeStory);
     } catch (err) {
         console.error("fetchDiscoverStories error:", err);
+        throw err;
     }
 }
 
 export async function fetchStoryViews(subStoryId: string) {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-storyviews?subStoryId=${encodeURIComponent(subStoryId)}`, {
-            method: "GET",
-            headers: await authHeaders(),
-        });
-        if (!res.ok) throw new Error("Failed to fetch story views");
-        return await res.json();
+        return await api.get<RawStoryView[]>(
+            `/api/fetch-storyviews?subStoryId=${encodeURIComponent(subStoryId)}`,
+            "Failed to fetch story views",
+        );
     } catch (err) {
         console.error("fetchStoryViews error:", err);
+        throw err;
     }
 }
 
 export async function fetchStoryLikes(subStoryId: string) {
     try {
-        const res = await fetch(`${API_URL}/api/fetch-storylikes`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify({ subStoryId }),
-        });
-        if (!res.ok) throw new Error("Failed to fetch story likes");
-        return await res.json();
+        return await api.post<RawStoryLike[]>("/api/fetch-storylikes", { subStoryId }, "Failed to fetch story likes");
     } catch (err) {
         console.error("fetchStoryLikes error:", err);
+        throw err;
     }
 }

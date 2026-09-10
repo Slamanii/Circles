@@ -46,6 +46,49 @@ function signToken(userId: string, email: string) {
     return jwt.sign({ userId, email }, process.env.JWT_SECRET!, { expiresIn: "7d" });
 }
 
+// ── Step-up (re-auth) ─────────────────────────────────────────────────────────
+// expo-local-authentication (this app's biometric lock) never leaves the device —
+// there's no signal the server can verify from it. Password re-entry is the
+// actual server-verifiable proof; the client may still show Face ID first as a
+// convenience before prompting for the password.
+
+export const STEP_UP_PURPOSES = ["wallet-sign", "export-secret"] as const;
+export type StepUpPurpose = typeof STEP_UP_PURPOSES[number];
+
+export async function reauth(userId: string, password: string, purpose: StepUpPurpose) {
+    const { data: user } = await supabase
+        .from("users")
+        .select("password_hash")
+        .eq("id", userId)
+        .single();
+
+    if (!user?.password_hash) throw new Error("Password re-authentication not available for this account");
+
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) throw new Error("Invalid password");
+
+    const stepUpToken = jwt.sign({ userId, purpose }, process.env.JWT_SECRET!, { expiresIn: "5m" });
+    return { stepUpToken, expiresIn: 300 };
+}
+
+export function requireStepUp(purpose: StepUpPurpose) {
+    return (req: AuthRequest, res: Response, next: NextFunction) => {
+        const token = req.headers["x-stepup-token"];
+        if (typeof token !== "string") {
+            return res.status(401).json({ error: "Step-up verification required" });
+        }
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string; purpose: string };
+            if (decoded.userId !== req.user!.id || decoded.purpose !== purpose) {
+                return res.status(401).json({ error: "Invalid step-up token" });
+            }
+            next();
+        } catch {
+            return res.status(401).json({ error: "Step-up token expired or invalid" });
+        }
+    };
+}
+
 // ── Email + password auth ────────────────────────────────────────────────────
 
 export async function loginOrSignup(email: string, password: string) {
@@ -123,70 +166,82 @@ export function getNonce(req: Request, res: Response) {
     res.json({ nonceToken });
 }
 
-// ── Wallet auth ──────────────────────────────────────────────────────────────
+// ── Wallet linking ───────────────────────────────────────────────────────────
+// Every real path here already carries an authenticated app session (every
+// account gets a custodial wallet at signup) — this proves ownership of an
+// external wallet and attaches it to the CURRENT user, it never resolves or
+// creates an identity from a bare address.
 
-export async function walletLogin(req: Request, res: Response) {
-    const { walletAddress, signature, message, nonceToken } = req.body;
-
+function verifyWalletOwnership(walletAddress: string, signature: string, message: string, nonceToken: string) {
     if (!walletAddress || !signature || !message || !nonceToken) {
-        return res.status(400).json({ error: "Missing fields" });
+        throw new Error("Missing fields");
     }
 
-    // Verify nonce JWT — checks expiry and that it was issued for this address
-    let nonce: string;
+    let decoded: { wallet: string; nonce: string };
     try {
-        const decoded = jwt.verify(nonceToken, process.env.JWT_SECRET!) as {
-            wallet: string;
-            nonce: string;
-        };
-        if (decoded.wallet !== walletAddress) {
-            return res.status(401).json({ error: "Nonce wallet mismatch" });
-        }
-        nonce = decoded.nonce;
+        decoded = jwt.verify(nonceToken, process.env.JWT_SECRET!) as { wallet: string; nonce: string };
     } catch {
-        return res.status(401).json({ error: "Invalid or expired nonce" });
+        throw new Error("Invalid or expired nonce");
+    }
+    if (decoded.wallet !== walletAddress) {
+        throw new Error("Nonce wallet mismatch");
     }
 
-    // Confirm the signed message contains the nonce
-    const expectedMessage = `Login to Fuego\nNonce: ${nonce}`;
+    const expectedMessage = `Login to Fuego\nNonce: ${decoded.nonce}`;
     if (message !== expectedMessage) {
-        return res.status(401).json({ error: "Message mismatch" });
+        throw new Error("Message mismatch");
     }
 
-    try {
-        const publicKey = new PublicKey(walletAddress);
-        const verified = nacl.sign.detached.verify(
-            new TextEncoder().encode(message),
-            bs58.decode(signature),
-            publicKey.toBytes(),
-        );
+    const publicKey = new PublicKey(walletAddress);
+    const verified = nacl.sign.detached.verify(
+        new TextEncoder().encode(message),
+        bs58.decode(signature),
+        publicKey.toBytes(),
+    );
+    if (!verified) throw new Error("Invalid signature");
+}
 
-        if (!verified) return res.status(401).json({ error: "Invalid signature" });
+export async function linkWallet(
+    userId: string,
+    walletAddress: string,
+    signature: string,
+    message: string,
+    nonceToken: string,
+) {
+    verifyWalletOwnership(walletAddress, signature, message, nonceToken);
 
-        let { data: user } = await supabase
-            .from("users")
-            .select("*")
-            .eq("address", walletAddress)
-            .single();
+    const { data: existing } = await supabase
+        .from("wallets")
+        .select("user_id")
+        .eq("address", walletAddress)
+        .maybeSingle();
 
-        if (!user) {
-            const { data } = await supabase
-                .from("users")
-                .insert({
-                    address: walletAddress,
-                    username: `user_${walletAddress.slice(0, 6)}`,
-                    display_name: `user_${walletAddress.slice(0, 6)}`,
-                })
-                .select()
-                .single();
-            user = data;
+    if (existing) {
+        if (existing.user_id !== userId) {
+            throw new Error("Wallet already linked to a different account");
         }
-
-        const token = signToken(user.id, user.email ?? "");
-        res.json({ user, token });
-    } catch (err) {
-        res.status(500).json({ error: "Login failed" });
+        return { address: walletAddress, alreadyLinked: true };
     }
+
+    const { data, error } = await supabase
+        .from("wallets")
+        .insert({ user_id: userId, address: walletAddress })
+        .select()
+        .single();
+
+    if (error) throw error;
+    return { address: data.address, alreadyLinked: false };
+}
+
+export async function listLinkedWallets(userId: string) {
+    const { data, error } = await supabase
+        .from("wallets")
+        .select("address, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true });
+
+    if (error) throw error;
+    return data ?? [];
 }
 
 // ── Push token ───────────────────────────────────────────────────────────────
@@ -205,29 +260,53 @@ export async function savePushToken(req: AuthRequest, res: Response) {
 }
 
 // ── Key encryption (for custodial wallet private keys) ───────────────────────
+// AES-256-GCM (authenticated — catches tampering/bit-flipping that plain CBC
+// can't) with a versioned key id baked into the ciphertext, so the master key
+// can be rotated later by introducing WALLET_ENCRYPTION_KEY_V2 etc. without
+// invalidating already-encrypted rows. `decryptPrivateKey` still understands
+// the original unversioned aes-256-cbc format (`iv:ciphertext`, no auth tag)
+// so pre-existing rows keep decrypting as-is — there is no data migration.
+
+const CURRENT_KEY_VERSION = process.env.WALLET_ENCRYPTION_KEY_VERSION || "v1";
+
+function resolveEncryptionKey(version: string): Buffer {
+    const envVar = version === "v1" ? "WALLET_ENCRYPTION_KEY" : `WALLET_ENCRYPTION_KEY_${version.toUpperCase()}`;
+    const hex = process.env[envVar];
+    if (!hex) throw new Error(`Missing encryption key for version "${version}" (expected env var ${envVar})`);
+    return Buffer.from(hex, "hex");
+}
 
 export function encryptPrivateKey(secretKey: string) {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(
-        "aes-256-cbc",
-        Buffer.from(process.env.WALLET_ENCRYPTION_KEY!, "hex"),
-        iv,
-    );
-    let encrypted = cipher.update(secretKey, "utf8", "hex");
-    encrypted += cipher.final("hex");
-    return `${iv.toString("hex")}:${encrypted}`;
+    const version = CURRENT_KEY_VERSION;
+    const key = resolveEncryptionKey(version);
+    const iv = crypto.randomBytes(12); // GCM's recommended IV size
+    const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+    const encrypted = Buffer.concat([cipher.update(secretKey, "utf8"), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    return `${version}:${iv.toString("hex")}:${authTag.toString("hex")}:${encrypted.toString("hex")}`;
 }
 
 export function decryptPrivateKey(encryptedKey: string) {
-    const [ivHex, encrypted] = encryptedKey.split(":");
-    const decipher = crypto.createDecipheriv(
-        "aes-256-cbc",
-        Buffer.from(process.env.WALLET_ENCRYPTION_KEY!, "hex"),
-        Buffer.from(ivHex, "hex"),
-    );
-    let decrypted = decipher.update(encrypted, "hex", "utf8");
-    decrypted += decipher.final("utf8");
-    return decrypted;
+    const parts = encryptedKey.split(":");
+
+    // Legacy unversioned aes-256-cbc format: `iv:ciphertext` (no auth tag).
+    if (parts.length === 2) {
+        const [ivHex, encrypted] = parts;
+        const decipher = crypto.createDecipheriv(
+            "aes-256-cbc",
+            resolveEncryptionKey("v1"),
+            Buffer.from(ivHex, "hex"),
+        );
+        let decrypted = decipher.update(encrypted, "hex", "utf8");
+        decrypted += decipher.final("utf8");
+        return decrypted;
+    }
+
+    const [version, ivHex, authTagHex, encryptedHex] = parts;
+    const decipher = crypto.createDecipheriv("aes-256-gcm", resolveEncryptionKey(version), Buffer.from(ivHex, "hex"));
+    decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
+    const decrypted = Buffer.concat([decipher.update(Buffer.from(encryptedHex, "hex")), decipher.final()]);
+    return decrypted.toString("utf8");
 }
 
 export async function exportWalletSecret(userId: string): Promise<{ secret: string; format: "mnemonic" | "legacy_key" }> {

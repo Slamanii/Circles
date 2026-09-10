@@ -45,8 +45,8 @@ export function SettingsModal({
                             await deleteAccount();
                             closeSettings();
                             logout();
-                        } catch (err: any) {
-                            Alert.alert("Error", err.message ?? "Please try again");
+                        } catch (err) {
+                            Alert.alert("Error", err instanceof Error ? err.message : "Please try again");
                         }
                     },
                 },

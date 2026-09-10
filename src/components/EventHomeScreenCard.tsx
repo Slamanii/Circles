@@ -1,4 +1,5 @@
-import { StyleSheet, View, Text, Button, Image, TouchableOpacity } from "react-native"
+import { StyleSheet, View, Text, Button, TouchableOpacity } from "react-native"
+import { Image } from "expo-image"
 
 
 export default function EventScreenCard({ event, onPreOrder, onLike, onGetTicket }: any) {

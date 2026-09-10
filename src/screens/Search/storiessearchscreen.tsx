@@ -1,12 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import { VIEWED_KEY } from "../Stories/storieslogic";
 import {
     Animated,
     FlatList,
-    Image,
     RefreshControl,
     StyleSheet,
     Text,
@@ -17,12 +17,13 @@ import {
 import { useAppTheme } from "../../context/ThemeContext";
 import { Colors, getColors, Radius, TAB_PAD } from "../../shared/theme";
 import useSearchLogic from "./searchlogic";
+import { NormalizedStory } from "../../../shared/Types";
 
 // Two mutually exclusive screen modes — like a switch/case over UI state
 type Mode = "stories" | "search";
 
-function StoryCircle({ item, onPress, viewed }: { item: any; onPress: () => void; viewed: boolean }) {
-    const avatar = { uri: item.subStories?.[0]?.mediaUrl ?? item.storyItems?.[0]?.media_url };
+function StoryCircle({ item, onPress, viewed }: { item: NormalizedStory; onPress: () => void; viewed: boolean }) {
+    const avatar = { uri: item.subStories?.[0]?.mediaUrl ?? item.previewMediaSnapshot ?? undefined };
     return (
         <TouchableOpacity style={styles.storyItem} onPress={onPress}>
             {viewed ? (
@@ -44,7 +45,7 @@ function StoryCircle({ item, onPress, viewed }: { item: any; onPress: () => void
                 </LinearGradient>
             )}
             <Text style={styles.storyName} numberOfLines={1}>
-                {item.userName ?? item.users?.username}
+                {item.userName}
             </Text>
         </TouchableOpacity>
     );
@@ -111,7 +112,7 @@ export default function StoriesSearchScreen() {
         setQuery,
         results,
         stories,
-        discoverStories,
+        previewStories,
         loading,
         recentSearches,
         onStoryPress,
@@ -133,8 +134,8 @@ export default function StoriesSearchScreen() {
 
     // Sort: unviewed first, viewed at the back
     const sortedStories = [...(stories ?? [])].sort((a, b) => {
-        const aViewed = viewedIds.has(a.storyId ?? a.id) ? 1 : 0;
-        const bViewed = viewedIds.has(b.storyId ?? b.id) ? 1 : 0;
+        const aViewed = viewedIds.has(a.storyId) ? 1 : 0;
+        const bViewed = viewedIds.has(b.storyId) ? 1 : 0;
         return aViewed - bViewed;
     });
 
@@ -179,7 +180,7 @@ export default function StoriesSearchScreen() {
                     data={sortedStories}
                     horizontal
                     showsHorizontalScrollIndicator={false}
-                    keyExtractor={(item) => item.storyId ?? item.id}
+                    keyExtractor={(item) => item.storyId}
                     contentContainerStyle={styles.storyRow}
                     ListHeaderComponent={
                         <TouchableOpacity style={styles.storyItem} onPress={onUploadPress}>
@@ -192,18 +193,18 @@ export default function StoriesSearchScreen() {
                     renderItem={({ item }) => (
                         <StoryCircle
                             item={item}
-                            viewed={viewedIds.has(item.storyId ?? item.id)}
-                            onPress={() => onStoryPress(item.storyId ?? item.id)}
+                            viewed={viewedIds.has(item.storyId)}
+                            onPress={() => onStoryPress(item.storyId)}
                         />
                     )}
                 />
 
                 {/* Discover grid */}
                 <FlatList
-                    data={discoverStories}
+                    data={previewStories}
                     numColumns={2}
                     key="discover"
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={(item) => item.storyId}
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.discoverGrid}
                     refreshControl={
@@ -218,15 +219,15 @@ export default function StoriesSearchScreen() {
                         <TouchableOpacity
                             style={styles.discoverItem}
                             activeOpacity={0.85}
-                            onPress={() => onStoryPress(item.id)}
+                            onPress={() => onStoryPress(item.storyId)}
                         >
                             <Image
-                                source={{ uri: item.preview_media_snapshot ?? item.storyItems?.[0]?.media_url }}
+                                source={{ uri: item.previewMediaSnapshot ?? item.subStories?.[0]?.mediaUrl ?? undefined }}
                                 style={styles.discoverImage}
                             />
                             <View style={styles.discoverOverlay}>
                                 <Text style={styles.discoverName} numberOfLines={1}>
-                                    {item.users?.username}
+                                    {item.userName}
                                 </Text>
                             </View>
                         </TouchableOpacity>
@@ -286,7 +287,7 @@ export default function StoriesSearchScreen() {
                     contentContainerStyle={styles.resultsList}
                     renderItem={({ item }) => (
                         <TouchableOpacity style={styles.userRow} onPress={() => onUserPress(item.id)}>
-                            <Image source={{ uri: item.avatar }} style={styles.userAvatar} />
+                            <Image source={{ uri: item.avatar ?? undefined }} style={styles.userAvatar} />
                             <View style={styles.userInfo}>
                                 <Text style={[styles.username, { color: C.text }]}>{item.username}</Text>
                                 {item.display_name ? (

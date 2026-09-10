@@ -1,19 +1,21 @@
+import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, AlertButton, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 import { LinkList, extractLinks } from "../../components/chat/LinkList";
 import { MediaGallery } from "../../components/chat/MediaGallery";
 import { MemberList } from "../../components/chat/MemberList";
-import { getGroup, makeAdmin, removeMember } from "../../services/chatService";
+import { deleteGroup, getGroup, leaveGroup, makeAdmin, removeMember } from "../../services/chatService";
+import { RawGroup } from "../../../shared/Types";
 
 type Tab = "members" | "media" | "links";
 
 export function ChatControlScreen({ route, navigation }: any) {
     const C = getColors(useAppTheme().theme);
     const { groupId } = route.params;
-    const [group, setGroup] = useState<any>(null);
+    const [group, setGroup] = useState<RawGroup | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<Tab>("members");
     const currentUserIdRef = useRef<string | null>(null);
@@ -40,10 +42,10 @@ export function ChatControlScreen({ route, navigation }: any) {
     const handleRemove = async (userId: string) => {
         try {
             await removeMember(groupId, userId);
-            setGroup((prev: any) => ({
+            setGroup((prev) => prev ? ({
                 ...prev,
-                group_members: prev.group_members.filter((m: any) => m.user_id !== userId),
-            }));
+                group_members: (prev.group_members ?? []).filter((m) => m.user_id !== userId),
+            }) : prev);
         } catch (err) { console.error("Remove failed", err); }
     };
 
@@ -51,13 +53,62 @@ export function ChatControlScreen({ route, navigation }: any) {
         if (!currentUserIdRef.current) return;
         try {
             await makeAdmin(groupId, userId, currentUserIdRef.current);
-            setGroup((prev: any) => ({
+            setGroup((prev) => prev ? ({
                 ...prev,
-                group_members: prev.group_members.map((m: any) =>
-                    m.user_id === userId ? { ...m, role: "admin" } : m
+                group_members: (prev.group_members ?? []).map((m) =>
+                    m.user_id === userId ? { ...m, role: "admin" as const } : m
                 ),
-            }));
+            }) : prev);
         } catch (err) { console.error("Make admin failed", err); }
+    };
+
+    const handleLeave = () => {
+        Alert.alert("Leave Group", "Are you sure you want to leave this group?", [
+            {
+                text: "Leave",
+                style: "destructive",
+                onPress: async () => {
+                    try {
+                        await leaveGroup(groupId);
+                        navigation.navigate("ChatListScreen");
+                    } catch (err) {
+                        console.error("Leave group failed", err);
+                        Alert.alert("Failed to leave group");
+                    }
+                },
+            },
+            { text: "Cancel", style: "cancel" },
+        ]);
+    };
+
+    const handleDelete = () => {
+        Alert.alert("Delete Group", "This will permanently delete the group for everyone. Continue?", [
+            {
+                text: "Delete",
+                style: "destructive",
+                onPress: async () => {
+                    try {
+                        await deleteGroup(groupId);
+                        navigation.navigate("ChatListScreen");
+                    } catch (err) {
+                        console.error("Delete group failed", err);
+                        Alert.alert("Failed to delete group");
+                    }
+                },
+            },
+            { text: "Cancel", style: "cancel" },
+        ]);
+    };
+
+    const openGroupMenu = () => {
+        const options: AlertButton[] = [
+            { text: "Leave Group", style: "destructive", onPress: handleLeave },
+        ];
+        if (isAdmin) {
+            options.push({ text: "Delete Group", style: "destructive", onPress: handleDelete });
+        }
+        options.push({ text: "Cancel", style: "cancel" });
+        Alert.alert("Group Options", "Choose an option", options);
     };
 
     if (loading) return <ActivityIndicator style={{ flex: 1 }} color={C.accent} />;
@@ -65,10 +116,13 @@ export function ChatControlScreen({ route, navigation }: any) {
 
     const members  = group.group_members ?? [];
     const messages = group.messages ?? [];
+    const isAdmin  = members.some(
+        (m) => m.user_id === currentUserIdRef.current && m.role === "admin"
+    );
 
     const mediaItems = messages
-        .filter((m: any) => m.type === "image" || m.type === "video")
-        .map((m: any) => ({ id: m.id, type: m.type, uri: m.content, thumbnail: m.media?.thumbnail }));
+        .filter((m) => m.type === "image" || m.type === "video")
+        .map((m) => ({ id: m.id, type: m.type as "image" | "video", uri: m.content, thumbnail: m.media?.thumbnail }));
 
     const links = extractLinks(messages);
 
@@ -85,6 +139,9 @@ export function ChatControlScreen({ route, navigation }: any) {
                     <Text style={[styles.back, { color: C.text }]}>←</Text>
                 </TouchableOpacity>
                 <Text style={[styles.groupName, { color: C.text }]}>{group.name}</Text>
+                <TouchableOpacity onPress={openGroupMenu} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Ionicons name="ellipsis-horizontal" size={22} color={C.text} />
+                </TouchableOpacity>
             </View>
 
             <View style={[styles.tabs, { borderBottomColor: C.border }]}>
@@ -113,7 +170,7 @@ export function ChatControlScreen({ route, navigation }: any) {
                 {activeTab === "media" && (
                     <MediaGallery
                         items={mediaItems}
-                        onPress={(item: any) => navigation.navigate("MediaViewer", { uri: item.uri, type: item.type })}
+                        onPress={(item) => navigation.navigate("MediaViewer", { uri: item.uri, type: item.type })}
                     />
                 )}
                 {activeTab === "links" && <LinkList links={links} />}
@@ -133,7 +190,7 @@ const styles = StyleSheet.create({
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
     back:       { fontSize: 22, marginRight: 16 },
-    groupName:  { fontSize: 18, fontWeight: "600" },
+    groupName:  { fontSize: 18, fontWeight: "600", flex: 1 },
     tabs:       { flexDirection: "row", borderBottomWidth: StyleSheet.hairlineWidth },
     tab:        { flex: 1, paddingVertical: 14, alignItems: "center" },
     tabText:    { fontSize: 14 },

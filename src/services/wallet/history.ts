@@ -1,35 +1,22 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../supabase";
+import { api } from "../apiClient";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
 const HELIUS_RPC_URL = process.env.EXPO_PUBLIC_HELIUS_RPC_URL!;
-
-async function authHeaders() {
-    const token = await AsyncStorage.getItem("token");
-    return {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-    };
-}
 
 // ── Treasury endpoints (admin use) ──────────────────────────────────────────
 
 export async function fetchTreasuryTxHistoryService(limit: number = 50, offset: number = 0) {
-    const res = await fetch(
-        `${API_URL}/api/fetch-treasury-tx?limit=${limit}&offset=${offset}`,
-        { headers: await authHeaders() }
+    return api.get(
+        `/api/fetch-treasury-tx?limit=${limit}&offset=${offset}`,
+        "Failed to fetch treasury transaction history",
     );
-    if (!res.ok) throw new Error("Failed to fetch treasury transaction history");
-    return res.json();
 }
 
 export async function fetchTxHistoryOnchainService(limit: number = 20) {
-    const res = await fetch(
-        `${API_URL}/api/fetch-treasury-tx-onchain?limit=${limit}`,
-        { headers: await authHeaders() }
+    return api.get(
+        `/api/fetch-treasury-tx-onchain?limit=${limit}`,
+        "Failed to fetch onchain treasury transactions",
     );
-    if (!res.ok) throw new Error("Failed to fetch onchain treasury transactions");
-    return res.json();
 }
 
 export async function fetchTreasuryTxHistory(limit: number = 50, offset: number = 0) {

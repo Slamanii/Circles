@@ -15,6 +15,7 @@ import SendTicketScreen from "../screens/Collectibles/sendTicketScreen";
 import TicketInfoScreen from "../screens/Collectibles/TicketInfoScreen";
 import TicketQRScreen from "../screens/Collectibles/TicketQRScreen";
 import CreateEventScreen from "../screens/Event/createEventScreen";
+import EventInfoScreen from "../screens/Event/eventInfoScreen";
 import EventPurchaseScreen from "../screens/Event/eventPurchaseScreen";
 import EventScreen from "../screens/Event/eventscreen";
 import HomeScreen from "../screens/Home/homescreen";
@@ -23,6 +24,7 @@ import StoriesSearchScreen from "../screens/Search/storiessearchscreen";
 import StoryScreen from "../screens/Stories/storiesscreen";
 import StoryUploadScreen from "../screens/Stories/uploadstoriesscreen";
 import EditProfileScreen from "../screens/User/editprofilescreen";
+import FollowListScreen from "../screens/User/followListScreen";
 import SettingsScreen from "../screens/User/settingsscreen";
 import UserMetrics from "../screens/User/usermetricsscreen";
 import UserScreen from "../screens/User/userscreen";
@@ -42,9 +44,9 @@ import WalletScreen from "../screens/Wallet/walletscreen";
 // Screens inside these stacks that have a back button → hide the floating tab bar
 const HIDE_TAB_ON: Record<string, string[]> = {
   Home:         ["EventDetails", "ChatListScreen", "ChatScreen", "ChatControl", "Notifications", "MediaViewer"],
-  Search:       ["StoryDetail", "StoryUpload", "UserProfile"],
+  Search:       ["StoryDetail", "StoryUpload", "UserProfile", "FollowList", "EventInfo"],
   Collectibles: ["TicketInfo", "TicketQR", "SendTicket"],
-  Profile:      ["lists"],
+  Profile:      ["lists", "UserProfile", "FollowList", "EventInfo"],
 };
 
 const Tab = createBottomTabNavigator();
@@ -102,6 +104,8 @@ function SearchStack() {
       <Stack.Screen name="StoryDetail" component={StoryScreen} />
       <Stack.Screen name="StoryUpload" component={StoryUploadScreen} />
       <Stack.Screen name="UserProfile" component={UserScreen} />
+      <Stack.Screen name="FollowList" component={FollowListScreen} />
+      <Stack.Screen name="EventInfo" component={EventInfoScreen} />
     </Stack.Navigator>
   );
 }
@@ -111,6 +115,9 @@ function UserStack() {
     <Stack.Navigator screenOptions={{ headerShown: false}}>
       <Stack.Screen name="ProfileScreen" component={UserScreen}/>
       <Stack.Screen name="lists" component={UserMetrics}/>
+      <Stack.Screen name="UserProfile" component={UserScreen} />
+      <Stack.Screen name="FollowList" component={FollowListScreen} />
+      <Stack.Screen name="EventInfo" component={EventInfoScreen} />
     </Stack.Navigator>
   )
 }

@@ -1,4 +1,5 @@
-import { ActivityIndicator, FlatList, Image, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Image } from "expo-image";
+import { ActivityIndicator, FlatList, Text, TextInput, TouchableOpacity, View } from "react-native";
 import useSearchLogic from "./searchlogic";
 
 export default function SearchScreen() {
@@ -30,7 +31,7 @@ export default function SearchScreen() {
                         style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}
                     >
                         <Image
-                            source={{ uri: item.avatar }}
+                            source={{ uri: item.avatar ?? undefined }}
                             style={{ width: 40, height: 40, borderRadius: 20, marginRight: 12, borderWidth: 2, borderColor: "orange" }}
                         />
                         <View>

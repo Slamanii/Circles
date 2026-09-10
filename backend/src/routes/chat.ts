@@ -10,9 +10,10 @@ export async function pinMessageRouter(req: AuthRequest, res: Response) {
         if (!messageId || !groupId) return res.status(400).json({ error: "Missing fields" });
         const result = await pinMessage({ messageId, userId, groupId });
         res.json(result);
-    } catch (error: any) {
+    } catch (error) {
         console.error(error);
-        res.status(error.message.includes("Not a group member") ? 403 : 500).json({ error: error.message });
+        const message = error instanceof Error ? error.message : "Failed to pin message";
+        res.status(message.includes("Not a group member") ? 403 : 500).json({ error: message });
     }
 }
 
@@ -23,9 +24,10 @@ export async function deleteMessageRouter(req: AuthRequest, res: Response) {
         if (!messageId || !deleteFor) return res.status(400).json({ error: "Missing fields" });
         const result = await deleteMessage({ messageId, userId, deleteFor });
         res.json(result);
-    } catch (error: any) {
+    } catch (error) {
         console.error(error);
-        res.status(error.message.includes("Only the sender") ? 403 : 500).json({ error: error.message });
+        const message = error instanceof Error ? error.message : "Failed to delete message";
+        res.status(message.includes("Only the sender") ? 403 : 500).json({ error: message });
     }
 }
 
@@ -36,8 +38,8 @@ export async function starMessageRouter(req: AuthRequest, res: Response) {
         if (!messageId) return res.status(400).json({ error: "Missing messageId" });
         const result = await starMessage(userId, messageId);
         res.json(result);
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : "Failed to star message" });
     }
 }
 
@@ -48,8 +50,8 @@ export async function unstarMessageRouter(req: AuthRequest, res: Response) {
         if (!messageId) return res.status(400).json({ error: "Missing messageId" });
         const result = await unstarMessage(userId, messageId);
         res.json(result);
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : "Failed to unstar message" });
     }
 }
 
@@ -60,8 +62,8 @@ export async function fetchNotificationsRouter(req: AuthRequest, res: Response) 
         const offset = parseInt(req.query.offset as string) || 0;
         const data   = await fetchNotifications(userId, limit, offset);
         res.json({ notifications: data });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch notifications" });
     }
 }
 
@@ -72,8 +74,8 @@ export async function fetchStarredIdsRouter(req: AuthRequest, res: Response) {
         if (!groupId) return res.status(400).json({ error: "Missing groupId" });
         const ids = await fetchStarredIds(userId, groupId);
         res.json({ ids });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
+    } catch (error) {
+        res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch starred ids" });
     }
 }
 
@@ -110,7 +112,7 @@ export async function getGroupRouter(req: AuthRequest, res: Response) {
     const userId = req.user!.id;
     const { groupId } = req.body;
 
-    const result = await getGroup( userId, groupId )
+    const result = await getGroup( groupId, userId )
     res.status(201).json(result)
 
     } catch (error) {
@@ -137,12 +139,12 @@ export async function sendMessageRouter(req: AuthRequest, res: Response) {
 
 export async function removeMemberRouter(req: AuthRequest, res: Response) {
 
-    try {     
-     
-    const userId = req.user!.id;
-    const memberData = req.body;
+    try {
 
-    const result = await removeMember({ userId, ...memberData })
+    const requestingUserId = req.user!.id;
+    const { groupId, userId: targetUserId } = req.body;
+
+    const result = await removeMember({ requestingUserId, targetUserId, groupId })
     res.status(201).json(result)
 
     } catch (error) {
@@ -163,9 +165,10 @@ export async function fetchMessagesRouter(req: AuthRequest, res: Response) {
     const result = await fetchMessages({ userId, ...messageData })
     res.status(201).json(result)
 
-    } catch (error: any) {
+    } catch (error) {
         console.error("fetchMessages error (full):", JSON.stringify(error));
-        const message = error?.message ?? error?.details ?? error?.hint ?? "Failed to fetch messages";
+        const e = error as { message?: string; details?: string; hint?: string };
+        const message = e?.message ?? e?.details ?? e?.hint ?? "Failed to fetch messages";
         res.status(500).json({ error: message });
     }
 }
@@ -204,11 +207,12 @@ export async function deleteGroupRouter(req: AuthRequest, res: Response) {
 
 export async function makeAdminRouter(req: AuthRequest, res: Response) {
 
-    try {     
-     
+    try {
+
+    const currentUserId = req.user!.id;
     const adminData = req.body;
 
-    const result = await makeAdmin({ ...adminData })
+    const result = await makeAdmin({ ...adminData, currentUserId })
     res.status(201).json(result)
 
     } catch (error) {
@@ -249,12 +253,12 @@ export async function markNotificationsReadRouter(req: AuthRequest, res: Respons
 
 export async function getUnreadCountRouter(req: AuthRequest, res: Response) {
 
-    try {     
-     
-    const userId = req.user!.id;
-    const messageData = req.body;
+    try {
 
-    const result = await getUnreadCount({ userId, ...messageData })
+    const userId = req.user!.id;
+    const { groupId } = req.query as { groupId: string };
+
+    const result = await getUnreadCount({ userId, groupId })
     res.status(201).json(result)
 
     } catch (error) {
@@ -263,11 +267,11 @@ export async function getUnreadCountRouter(req: AuthRequest, res: Response) {
     }
 }
 
-export async function markAsReadRouter(req: any, res: any) {
+export async function markAsReadRouter(req: AuthRequest, res: Response) {
 
-    try {     
-     
-    const userId = req.user.id;
+    try {
+
+    const userId = req.user!.id;
     const messageData = req.body;
 
     const result = await markAsRead({ userId, ...messageData })

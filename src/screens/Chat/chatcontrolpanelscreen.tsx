@@ -1,6 +1,6 @@
 import { useNavigation } from "@react-navigation/native";
 import { useEffect, useState } from "react";
-import { fetchUserGroups } from "../../services/chatService";
+import { fetchUserGroups, getUnreadCount } from "../../services/chatService";
 import { getUser } from "../../services/user";
 
 export function useChatListLogic() {
@@ -10,19 +10,32 @@ export function useChatListLogic() {
     const [selectionMode, setSelectionMode] = useState(false);
     const [username, setUsername] = useState("");
     const [groups, setGroups] = useState<any[]>([]);
+    const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+    const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
-        async function load() {
-            try {
-                const [user, groupData] = await Promise.all([getUser(), fetchUserGroups()]);
-                setUsername(user.username);
-                setGroups(groupData ?? []);
-            } catch (err) {
-                console.error("Failed to load chat list", err);
-            }
+    const load = async () => {
+        try {
+            const [user, groupData] = await Promise.all([getUser(), fetchUserGroups()]);
+            setUsername(user.username);
+            setGroups(groupData ?? []);
+
+            const groupIds: string[] = (groupData ?? [])
+                .map((item: any) => (item.groups ?? item)?.id)
+                .filter(Boolean);
+            const counts = await Promise.all(groupIds.map((id) => getUnreadCount(id)));
+            setUnreadCounts(Object.fromEntries(groupIds.map((id, i) => [id, counts[i]])));
+        } catch (err) {
+            console.error("Failed to load chat list", err);
         }
-        load();
-    }, []);
+    };
+
+    useEffect(() => { load(); }, []);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await load();
+        setRefreshing(false);
+    };
 
     const toggleSelection = () => setSelectionMode(prev => !prev);
 
@@ -37,6 +50,9 @@ export function useChatListLogic() {
     return {
         username,
         groups,
+        unreadCounts,
+        refreshing,
+        onRefresh,
         archiveFilter,
         selectionMode,
         onFilterChange: handleFilterChange,

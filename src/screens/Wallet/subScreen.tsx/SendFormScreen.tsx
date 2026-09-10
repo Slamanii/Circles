@@ -14,6 +14,7 @@ import { Token } from "../../../../shared/Types";
 export default function SendFormScreen({ navigation, route }: any) {
     const token: Token = route.params?.token;
     const walletAddress: string = route.params?.walletAddress ?? "";
+    const activeWallet = route.params?.activeWallet ?? null;
 
     const [address, setAddress] = useState("");
     const [amount,  setAmount]  = useState("");
@@ -84,6 +85,7 @@ export default function SendFormScreen({ navigation, route }: any) {
                         amount,
                         address: address.trim(),
                         walletAddress,
+                        activeWallet,
                     })}
                     disabled={!canContinue}
                 >

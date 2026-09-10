@@ -85,7 +85,23 @@ export async function searchUsers(query: string) {
     return data
 }
 
-export async function fetchFollowers(userId: string) {
+async function markFollowedByViewer(rows: any[], idKey: "follower_id" | "following_id", viewerId: string) {
+    const ids = rows.map((r) => r[idKey]).filter(Boolean);
+    if (ids.length === 0) return rows;
+
+    const { data: viewerFollows } = await supabase
+        .from("follows")
+        .select("following_id")
+        .eq("follower_id", viewerId)
+        .in("following_id", ids);
+
+    const followedSet = new Set((viewerFollows ?? []).map((f) => f.following_id));
+    return rows.map((r) => ({ ...r, isFollowing: followedSet.has(r[idKey]) }));
+}
+
+const FOLLOW_LIST_PAGE_SIZE = 30;
+
+export async function fetchFollowers(userId: string, viewerId: string, limit: number = FOLLOW_LIST_PAGE_SIZE, offset: number = 0) {
 
     const { data, error } = await supabase
         .from("follows")
@@ -94,33 +110,35 @@ export async function fetchFollowers(userId: string) {
             users!follows_follower_id_fkey (
                 id,
                 username,
-                avatar_url
+                avatar
             )
             `)
         .eq("following_id", userId)
+        .range(offset, offset + limit - 1)
 
         if (error) throw new Error("Couldn't load followers, try again.");
 
-        return data
+        return markFollowedByViewer(data ?? [], "follower_id", viewerId)
 }
 
-export async function fetchFollowing(userId: string) {
+export async function fetchFollowing(userId: string, viewerId: string, limit: number = FOLLOW_LIST_PAGE_SIZE, offset: number = 0) {
 
     const { data, error } = await supabase
         .from("follows")
         .select(`
             following_id,
-            users!follows_follower_id_fkey (
+            users!follows_following_id_fkey (
                 id,
                 username,
-                avatar_url
+                avatar
             )
             `)
         .eq("follower_id", userId)
+        .range(offset, offset + limit - 1)
 
         if (error) throw new Error("Couldn't load following, try again.");
-        
-        return data
+
+        return markFollowedByViewer(data ?? [], "following_id", viewerId)
 }
 
 export async function followUser(
@@ -138,6 +156,22 @@ export async function followUser(
     if (error) throw error
 
     return data
+}
+
+export async function unfollowUser(
+    userId: string,
+    followingId: string,
+) {
+
+    const { error } = await supabase
+        .from("follows")
+        .delete()
+        .eq("follower_id", userId)
+        .eq("following_id", followingId)
+
+    if (error) throw error
+
+    return { success: true }
 }
 
 export async function fetchEventLikes(eventId: string, userId: string) {

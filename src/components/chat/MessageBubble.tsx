@@ -1,9 +1,10 @@
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Audio } from "expo-av";
+import { Image } from "expo-image";
 import { useRef, useState } from "react";
 import {
-    Image, Modal, StyleSheet, Text, TouchableOpacity,
+    Modal, StyleSheet, Text, TouchableOpacity,
     TouchableWithoutFeedback, View,
 } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";

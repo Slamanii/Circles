@@ -1,38 +1,16 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
+import { api } from "./apiClient";
+import { setToken } from "./secureStorage";
 
 export async function deleteAccount() {
-    const token = await AsyncStorage.getItem("token");
-    const res = await fetch(`${API_URL}/api/delete-account`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error("Failed to request account deletion");
-    return res.json();
+    return api.post("/api/delete-account", undefined, "Failed to request account deletion");
 }
 
-
 export async function Login(email: string, password: string) {
-
     try {
-        const res = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/login`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ email, password }),
-        });
-
-    if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(body.error ?? "Failed to login");
-        }
-
-        const data = await res.json();
+        const data = await api.post("/api/login", { email, password }, "Failed to login");
 
         if (data.token) {
-            await AsyncStorage.setItem("token", data.token);
+            await setToken(data.token);
         }
         return data;
     } catch (err) {

@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { Login } from "../../services/login";
 import { Colors } from "../../shared/theme";
+import PasswordInput from "../../components/PasswordInput";
 
 type Props = {
     onSuccess: (user: any, token: string) => void;
@@ -26,8 +27,8 @@ export default function SignInScreen({ onSuccess, onGoToCreate }: Props) {
             const data = await Login(email.trim(), password);
             if (data?.user && data?.token) onSuccess(data.user, data.token);
             else Alert.alert("Sign in failed", "Invalid credentials");
-        } catch (err: any) {
-            Alert.alert("Sign in failed", err.message ?? "Check your credentials and try again");
+        } catch (err) {
+            Alert.alert("Sign in failed", err instanceof Error ? err.message : "Check your credentials and try again");
         } finally {
             setLoading(false);
         }
@@ -55,13 +56,10 @@ export default function SignInScreen({ onSuccess, onGoToCreate }: Props) {
                         keyboardType="email-address"
                         returnKeyType="next"
                     />
-                    <TextInput
-                        style={styles.input}
+                    <PasswordInput
                         placeholder="Password"
-                        placeholderTextColor="#555"
                         value={password}
                         onChangeText={setPassword}
-                        secureTextEntry
                         returnKeyType="done"
                         onSubmitEditing={handleSignIn}
                     />

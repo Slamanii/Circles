@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
+import { useNavigation } from "@react-navigation/native";
 import React, { useState } from "react";
 import {
     Dimensions,
-    Image,
     Linking,
     RefreshControl,
     ScrollView,
@@ -13,9 +14,10 @@ import {
     View,
 } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
-import { Colors, getColors } from "../../shared/theme";
+import { Colors, getColors, ThemeColors } from "../../shared/theme";
 import { TAB_BAR_HEIGHT } from "../../navigation";
 import { useUserLogic } from "./userlogic";
+import { NormalizedStory, RawEventSummary } from "../../../shared/Types";
 
 type Tab = "events" | "stories";
 const SCREEN_W = Dimensions.get("window").width;
@@ -24,6 +26,7 @@ export default function UserScreen({ route }: any) {
     const followingId = route?.params?.followingId;
     const { theme } = useAppTheme();
     const C = getColors(theme);
+    const navigation = useNavigation<any>();
 
     const [showMore, setShowMore] = useState(false);
     const [activeTab, setActiveTab] = useState<Tab>("events");
@@ -37,6 +40,7 @@ export default function UserScreen({ route }: any) {
         link2,
         followers,
         following,
+        profileUserId,
         followed,
         isOwnProfile,
         isPrivate,
@@ -55,6 +59,11 @@ export default function UserScreen({ route }: any) {
         refreshing,
         onRefresh,
     } = useUserLogic(followingId);
+
+    const openFollowList = (mode: "followers" | "following") => {
+        if (!profileUserId) return;
+        navigation.navigate("FollowList", { userId: profileUserId, mode, username });
+    };
 
     const hasMore = bio || link1 || link2;
 
@@ -121,12 +130,21 @@ export default function UserScreen({ route }: any) {
                                 <Text style={[styles.handle, { color: C.textSecondary }]}>@{username}</Text>
                             ) : null}
 
-                            <Text style={[styles.counts, { color: C.textSecondary }]}>
-                                <Text style={{ color: C.text, fontWeight: "600" }}>{followers}</Text>
-                                {" followers · "}
-                                <Text style={{ color: C.text, fontWeight: "600" }}>{following}</Text>
-                                {" following"}
-                            </Text>
+                            <View style={styles.countsRow}>
+                                <TouchableOpacity onPress={() => openFollowList("followers")}>
+                                    <Text style={[styles.counts, { color: C.textSecondary }]}>
+                                        <Text style={{ color: C.text, fontWeight: "600" }}>{followers}</Text>
+                                        {" followers"}
+                                    </Text>
+                                </TouchableOpacity>
+                                <Text style={[styles.counts, { color: C.textSecondary }]}>{" · "}</Text>
+                                <TouchableOpacity onPress={() => openFollowList("following")}>
+                                    <Text style={[styles.counts, { color: C.textSecondary }]}>
+                                        <Text style={{ color: C.text, fontWeight: "600" }}>{following}</Text>
+                                        {" following"}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
 
@@ -218,7 +236,12 @@ export default function UserScreen({ route }: any) {
                                     ) : (
                                         <>
                                             {hostedEvents.slice(0, hostedVisible).map((ev) => (
-                                                <EventRow key={ev.id} event={ev} C={C} />
+                                                <EventRow
+                                                    key={ev.id}
+                                                    event={ev}
+                                                    C={C}
+                                                    onPress={isOwnProfile ? () => navigation.navigate("EventInfo", { eventId: ev.id, flyerCard: ev.flyer_card }) : undefined}
+                                                />
                                             ))}
                                             {hostedVisible < hostedEvents.length && (
                                                 <ShowMore onPress={showMoreHosted} C={C} />
@@ -253,7 +276,7 @@ export default function UserScreen({ route }: any) {
     );
 }
 
-function Section({ title, C, children }: { title: string; C: any; children: React.ReactNode }) {
+function Section({ title, C, children }: { title: string; C: ThemeColors; children: React.ReactNode }) {
     return (
         <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: C.text }]}>{title}</Text>
@@ -262,9 +285,10 @@ function Section({ title, C, children }: { title: string; C: any; children: Reac
     );
 }
 
-function EventRow({ event, C }: { event: any; C: any }) {
+function EventRow({ event, C, onPress }: { event: RawEventSummary; C: ThemeColors; onPress?: () => void }) {
+    const Wrapper = onPress ? TouchableOpacity : View;
     return (
-        <View style={styles.eventRow}>
+        <Wrapper style={styles.eventRow} onPress={onPress} activeOpacity={onPress ? 0.7 : undefined}>
             {event.flyer_card ? (
                 <Image source={{ uri: event.flyer_card }} style={styles.thumb} />
             ) : (
@@ -277,11 +301,12 @@ function EventRow({ event, C }: { event: any; C: any }) {
                         .filter(Boolean).join(" · ")}
                 </Text>
             </View>
-        </View>
+            {onPress ? <Ionicons name="chevron-forward" size={16} color={C.textMuted} /> : null}
+        </Wrapper>
     );
 }
 
-function ShowMore({ onPress, C }: { onPress: () => void; C: any }) {
+function ShowMore({ onPress, C }: { onPress: () => void; C: ThemeColors }) {
     return (
         <TouchableOpacity style={[styles.showMoreBtn, { borderColor: C.border }]} onPress={onPress}>
             <Text style={[styles.showMoreText, { color: C.textSecondary }]}>Show more</Text>
@@ -340,7 +365,7 @@ function TabSwitcher({ active, onChange }: { active: Tab; onChange: (t: Tab) => 
     );
 }
 
-function StoriesGrid({ stories, C }: { stories: any[]; C: any }) {
+function StoriesGrid({ stories, C }: { stories: NormalizedStory[]; C: ThemeColors }) {
     if (stories.length === 0) {
         return (
             <View style={gridStyles.empty}>
@@ -352,9 +377,9 @@ function StoriesGrid({ stories, C }: { stories: any[]; C: any }) {
     return (
         <View style={gridStyles.grid}>
             {stories.map((story) => (
-                <View key={story.id} style={[gridStyles.cell, { backgroundColor: C.surface }]}>
-                    {story.media_url ? (
-                        <Image source={{ uri: story.media_url }} style={gridStyles.image} resizeMode="cover" />
+                <View key={story.storyId} style={[gridStyles.cell, { backgroundColor: C.surface }]}>
+                    {story.previewMediaSnapshot ? (
+                        <Image source={{ uri: story.previewMediaSnapshot }} style={gridStyles.image} contentFit="cover" />
                     ) : (
                         <View style={[gridStyles.image, { backgroundColor: C.surface }]} />
                     )}
@@ -450,6 +475,7 @@ const styles = StyleSheet.create({
     },
     moreBtnText: { color: "#fff", fontSize: 12, fontWeight: "600" },
     handle: { fontSize: 13 },
+    countsRow: { flexDirection: "row", alignItems: "center" },
     counts: { fontSize: 13 },
     moreSection: { marginTop: 14, gap: 8 },
     bio: { fontSize: 14, lineHeight: 20 },

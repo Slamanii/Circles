@@ -48,6 +48,7 @@ export async function getGroup(groupId: string, userId: string) {
                 content,
                 type,
                 sender_id,
+                senderName,
                 created_at,
                 media,
                 reply_to
@@ -180,21 +181,20 @@ export async function fetchStarredIds(userId: string, groupId: string) {
 
 
 export async function removeMember({
-    groupId, 
-    userId,
+    groupId,
+    requestingUserId,
+    targetUserId,
 }: {
     groupId: string;
-    userId: string;
-}) { 
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
+    requestingUserId: string;
+    targetUserId: string;
+}) {
 
     const { data: admin, error: adminError } = await supabase
         .from("group_members")
         .select("id")
         .eq("group_id", groupId)
-        .eq("user_id", user.id)
+        .eq("user_id", requestingUserId)
         .eq("role", "admin")
         .single();
 
@@ -202,7 +202,7 @@ export async function removeMember({
         throw new Error("No admin priviledges");
     }
 
-    if (userId === user.id) {
+    if (targetUserId === requestingUserId) {
         throw new Error("Admin cannot be removed");
     }
 
@@ -210,13 +210,13 @@ export async function removeMember({
         .from("group_members")
         .delete()
         .eq("group_id", groupId)
-        .eq("user_id", userId);
+        .eq("user_id", targetUserId);
 
 
         if (removeError) throw removeError;
 
         await supabase.from("notifications").insert({
-            user_id: userId,
+            user_id: targetUserId,
             type: "chat",
             title: "New Message",
             body: "You were removed from the group",
@@ -225,7 +225,7 @@ export async function removeMember({
             });
 
         return {
-            succes: true
+            success: true
         };
 }
 

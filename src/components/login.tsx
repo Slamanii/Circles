@@ -18,8 +18,8 @@ export default function LoginScreen({ onLogin }: any) {
             if (data?.user && data?.token) {
                 onLogin(data.user, data.token);
             }
-        } catch (err: any) {
-            Alert.alert("Login failed", err.message ?? "Check your credentials and try again");
+        } catch (err) {
+            Alert.alert("Login failed", err instanceof Error ? err.message : "Check your credentials and try again");
         } finally {
             setLoading(false);
         }

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image } from "expo-image";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAppTheme } from "../context/ThemeContext";
 import { Event } from "../hooks/useEvents";
 import { Colors, Radius, getColors } from "../shared/theme";

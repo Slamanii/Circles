@@ -1,5 +1,6 @@
+import { Image } from "expo-image";
 import { useState } from "react";
-import { Button, FlatList, Image, Text, TouchableOpacity, View, StyleSheet } from "react-native";
+import { Button, FlatList, Text, TouchableOpacity, View, StyleSheet } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 import { useNavigation } from "@react-navigation/native";

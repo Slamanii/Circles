@@ -1,4 +1,4 @@
-import { createEvent, fetchEvents, likeEvent, preSave, mintTickets, expireStaleEvents, burnExpiredTickets, getEventById } from "../mod/events"
+import { createEvent, fetchEvents, likeEvent, preSave, runMintJob, resumeStuckMints, expireStaleEvents, burnExpiredTickets, getEventById, getEventStats } from "../mod/events"
 import { AuthRequest } from "../mod/auth"
 import { Request, Response } from "express"
 import { supabase } from "../services/supabase"
@@ -31,11 +31,23 @@ export async function createEventRouter(req: AuthRequest, res: Response) {
     }
 }
 
+export async function eventStatsRouter(req: AuthRequest, res: Response) {
+    try {
+        const eventId = req.query.eventId as string;
+        const stats = await getEventStats(eventId, req.user!.id);
+        res.status(200).json(stats);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to fetch event stats";
+        console.error("getEventStats error:", message);
+        res.status(message === "Unauthorized" ? 403 : 500).json({ error: message });
+    }
+}
+
 export async function likeEventRouter(req: AuthRequest, res: Response) {
 
     try {
         const userId = req.user!.id;
-        const eventId = req.body;
+        const { eventId } = req.body;
 
         const result = await likeEvent({ userId, eventId })
 
@@ -50,7 +62,7 @@ export async function preSaveRouter(req: AuthRequest, res: Response) {
 
     try {
         const userId = req.user!.id;
-        const eventId = req.body;
+        const { eventId } = req.body;
 
         const result = await preSave({ userId, eventId })
 
@@ -63,12 +75,37 @@ export async function preSaveRouter(req: AuthRequest, res: Response) {
 
 export async function mintTicketsRouter(req: AuthRequest, res: Response) {
     try {
-        const { supply, eventId } = req.body;
-        const result = await mintTickets({ supply, eventId });
-        res.status(201).json(result);
+        const { eventId } = req.body;
+        const userId = req.user!.id;
+
+        const { data: event, error: fetchError } = await supabase
+            .from("events")
+            .select("creator_id")
+            .eq("id", eventId)
+            .single();
+
+        if (fetchError || !event) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        if (event.creator_id !== userId) {
+            return res.status(403).json({ error: "Not authorized to mint tickets for this event" });
+        }
+
+        runMintJob(eventId);
+        res.status(202).json({ status: "queued" });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: "Failed to mint Tickets" });
+    }
+}
+
+export async function resumeStuckMintsRouter(_req: AuthRequest, res: Response) {
+    try {
+        await resumeStuckMints();
+        res.json({ status: "ok" });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to resume stuck mints" });
     }
 }
 

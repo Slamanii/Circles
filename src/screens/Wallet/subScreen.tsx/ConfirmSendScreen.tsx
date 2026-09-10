@@ -8,7 +8,11 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import PasswordPromptModal from "../../../components/PasswordPromptModal";
 import { useMobileWallet } from "../../../hooks/useMobileWallet";
+import { useStepUp } from "../../../hooks/useStepUp";
+import { CUSTODIAL } from "../../../hooks/useWalletConnection";
+import { makeCustodialSigner } from "../../../services/wallet/custodialSign";
 import { sendSol, sendSplToken } from "../../../services/wallet/send";
 import { Token } from "../../../../shared/Types";
 
@@ -24,15 +28,18 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function ConfirmSendScreen({ navigation, route }: any) {
-    const { token, amount, address, walletAddress }: {
-        token: Token; amount: string; address: string; walletAddress: string;
+    const { token, amount, address, walletAddress, activeWallet }: {
+        token: Token; amount: string; address: string; walletAddress: string; activeWallet: string | null;
     } = route.params;
 
     const { account, signAndSendTransaction } = useMobileWallet() as any;
+    const { requestStepUp, promptProps } = useStepUp();
     const [loading, setLoading] = useState(false);
 
-    const effectiveAddress = account?.address?.toBase58() ?? walletAddress;
-    const canSign = !!account && typeof signAndSendTransaction === "function";
+    const isCustodial = activeWallet === CUSTODIAL;
+    const effectiveAddress = isCustodial ? walletAddress : (account?.address?.toBase58() ?? walletAddress);
+    const canSign = isCustodial || (!!account && typeof signAndSendTransaction === "function");
+    const signer = isCustodial ? makeCustodialSigner(requestStepUp) : signAndSendTransaction;
 
     const handleSend = async () => {
         if (!canSign) {
@@ -45,13 +52,13 @@ export default function ConfirmSendScreen({ navigation, route }: any) {
             const sig = isSol
                 ? await sendSol({
                     fromAddress: effectiveAddress,
-                    signAndSend: signAndSendTransaction,
+                    signAndSend: signer,
                     destination: address,
                     amount: parseFloat(amount),
                 })
                 : await sendSplToken({
                     fromAddress: effectiveAddress,
-                    signAndSend: signAndSendTransaction,
+                    signAndSend: signer,
                     destination: address,
                     mint: token.id,
                     amount: parseFloat(amount),
@@ -61,8 +68,8 @@ export default function ConfirmSendScreen({ navigation, route }: any) {
             Alert.alert("Sent!", `Transaction: ${sig.slice(0, 12)}...`, [
                 { text: "Done", onPress: () => navigation.popToTop() },
             ]);
-        } catch (err: any) {
-            Alert.alert("Send failed", err.message);
+        } catch (err) {
+            Alert.alert("Send failed", err instanceof Error ? err.message : "Unknown error");
         } finally {
             setLoading(false);
         }
@@ -102,6 +109,8 @@ export default function ConfirmSendScreen({ navigation, route }: any) {
                     : <Text style={styles.sendText}>Confirm & Send</Text>
                 }
             </TouchableOpacity>
+
+            <PasswordPromptModal {...promptProps} />
         </View>
     );
 }

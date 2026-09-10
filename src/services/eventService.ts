@@ -1,21 +1,8 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { api } from "./apiClient";
 import { uploadMedia } from "./upload";
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
-async function authHeaders() {
-    const token = await AsyncStorage.getItem("token");
-    return {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-    };
-}
-
 export async function fetchEvents(limit: number = 50, offset: number = 0) {
-    const headers = await authHeaders();
-    const res = await fetch(`${API_URL}/api/fetch-events?limit=${limit}&offset=${offset}`, { headers });
-    if (!res.ok) throw new Error("Failed to fetch events");
-    return await res.json();
+    return api.get(`/api/fetch-events?limit=${limit}&offset=${offset}`, "Failed to fetch events");
 }
 
 export async function uploadFlyer(uri: string): Promise<string> {
@@ -24,75 +11,45 @@ export async function uploadFlyer(uri: string): Promise<string> {
 
 export async function createEvent(eventData: any) {
     try {
-        const res = await fetch(`${API_URL}/api/create-event`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify(eventData),
-        });
-        if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(body.error ?? "Failed to create event");
-        }
-        return await res.json();
+        return await api.post("/api/create-event", eventData, "Failed to create event");
     } catch (err) {
         console.error("createEvent error:", err);
+        throw err;
     }
 }
 
 export async function LikeEvent(eventId: string) {
     try {
-        const res = await fetch(`${API_URL}/api/like-event`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify({ eventId }),
-        });
-        if (!res.ok) throw new Error("Failed to like event");
-        return await res.json();
+        return await api.post("/api/like-event", { eventId }, "Failed to like event");
     } catch (err) {
         console.error("likeEvent error:", err);
+        throw err;
     }
 }
 
 export async function PreOrder(eventId: string) {
     try {
-        const res = await fetch(`${API_URL}/api/initiate-wallet-tx`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify({ eventId }),
-        });
-        if (!res.ok) throw new Error("Failed to preorder");
-        return await res.json();
+        return await api.post("/api/initiate-wallet-tx", { eventId }, "Failed to preorder");
     } catch (err) {
         console.error("PreOrder error:", err);
+        throw err;
     }
 }
 
 export async function PreSave(eventId: string) {
     try {
-        const res = await fetch(`${API_URL}/api/presave-event`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify({ eventId }),
-        });
-        if (!res.ok) throw new Error("Failed to presave event");
-        return await res.json();
+        return await api.post("/api/presave-event", { eventId }, "Failed to presave event");
     } catch (err) {
         console.error("PreSave error:", err);
+        throw err;
     }
 }
 
 export async function mintTickets(eventId: string, supply: number, creatorId: string) {
     try {
-        const res = await fetch(`${API_URL}/api/mint-tickets`, {
-            method: "POST",
-            headers: await authHeaders(),
-            body: JSON.stringify({ eventId, supply, creatorId }),
-        });
-        if (!res.ok) throw new Error("Failed to mint tickets");
-        return await res.json();
+        return await api.post("/api/mint-tickets", { eventId, supply, creatorId }, "Failed to mint tickets");
     } catch (err) {
         console.error("mintTickets error:", err);
+        throw err;
     }
 }
-
-

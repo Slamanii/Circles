@@ -1,17 +1,22 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
 import {
+    Alert,
     Animated,
-    Image,
+    Share,
     StyleSheet,
     Text,
     TouchableOpacity,
     TouchableWithoutFeedback,
     View,
 } from "react-native";
-import { fetchStories, likeStory } from "../../services/story";
-import useStoryLogic from "./storieslogic";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { deleteStory, deleteSubStory, fetchStoryById, fetchStoryLikes, fetchStoryViews, likeStory, unlikeStory } from "../../services/story";
+import { unfollowUser } from "../../services/user";
+import useStoryLogic, { muteStoryUser } from "./storieslogic";
 import { useNavigation } from "@react-navigation/native";
+import { NormalizedStory, RawStoryLike, RawStoryView } from "../../../shared/Types";
 
 const STORY_DURATION = 5000;
 
@@ -41,22 +46,48 @@ function ProgressBars({ total, current, progress }: { total: number; current: nu
 export default function StoryScreen({ route }: any) {
     const { storyId, subId } = route.params;
     const navigation = useNavigation<any>();
-    const [stories, setStories] = useState<any[]>([]);
+    const [story, setStory] = useState<NormalizedStory | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [liked, setLiked] = useState(false);
+    const [viewers, setViewers] = useState<RawStoryView[]>([]);
+    const [likers, setLikers] = useState<RawStoryLike[]>([]);
 
     const progress = useRef(new Animated.Value(0)).current;
     const animRef  = useRef<Animated.CompositeAnimation | null>(null);
     const pausedAt = useRef(0);
 
     useEffect(() => {
-        fetchStories()
-            .then(setStories)
+        fetchStoryById(storyId)
+            .then((s) => setStory(s ?? null))
             .catch(console.error)
             .finally(() => setLoading(false));
-    }, []);
+        AsyncStorage.getItem("user")
+            .then((s) => setCurrentUserId(s ? JSON.parse(s).id : null))
+            .catch(() => {});
+    }, [storyId]);
 
-    const { story, currentSubStory, next, prev, currentIndex, total } = useStoryLogic(storyId, subId, stories);
+    const { currentSubStory, next, prev, currentIndex, total } = useStoryLogic(story, subId);
+    const isOwner = !!story && !!currentUserId && story.userId === currentUserId;
+
+    // Fetch likes (all viewers, to init the heart state) and views (owner-only) per sub-story
+    useEffect(() => {
+        if (!currentSubStory) return;
+        fetchStoryLikes(currentSubStory.subId)
+            .then((data) => {
+                setLikers(data ?? []);
+                setLiked((data ?? []).some((l) => l.user_id === currentUserId));
+            })
+            .catch(console.error);
+
+        if (isOwner) {
+            fetchStoryViews(currentSubStory.subId)
+                .then((data) => setViewers(data ?? []))
+                .catch(console.error);
+        } else {
+            setViewers([]);
+        }
+    }, [currentSubStory?.subId, currentUserId, isOwner]);
 
     // Restart progress bar whenever sub-story changes
     useEffect(() => {
@@ -95,10 +126,92 @@ export default function StoryScreen({ route }: any) {
 
     const handleLike = async () => {
         if (!currentSubStory) return;
-        setLiked(prev => !prev);
+        const nextLiked = !liked;
+        setLiked(nextLiked);
+        setLikers((prev) =>
+            nextLiked
+                ? [...prev, { user_id: currentUserId ?? "", users: null }]
+                : prev.filter((l) => l.user_id !== currentUserId)
+        );
         try {
-            await likeStory({ storyItemId: currentSubStory.subId });
+            if (nextLiked) {
+                await likeStory({ storyItemId: currentSubStory.subId });
+            } else {
+                await unlikeStory({ storyItemId: currentSubStory.subId });
+            }
         } catch { /* optimistic update already applied */ }
+    };
+
+    const handleOpenMenu = () => {
+        if (!currentSubStory) return;
+        Alert.alert("Story Options", "Choose an option", [
+            {
+                text: "Delete This Photo/Video",
+                style: "destructive",
+                onPress: async () => {
+                    try {
+                        await deleteSubStory(currentSubStory.subId);
+                        if (total <= 1) {
+                            navigation.goBack();
+                        } else {
+                            fetchStoryById(storyId).then((s) => setStory(s ?? null)).catch(console.error);
+                        }
+                    } catch (err) {
+                        console.error("deleteSubStory failed", err);
+                        Alert.alert("Failed to delete");
+                    }
+                },
+            },
+            {
+                text: "Delete Entire Story",
+                style: "destructive",
+                onPress: async () => {
+                    try {
+                        await deleteStory(storyId);
+                        navigation.goBack();
+                    } catch (err) {
+                        console.error("deleteStory failed", err);
+                        Alert.alert("Failed to delete story");
+                    }
+                },
+            },
+            { text: "Cancel", style: "cancel" },
+        ]);
+    };
+
+    const handleOpenOtherMenu = () => {
+        if (!story) return;
+        Alert.alert("Story Options", "Choose an option", [
+            {
+                text: "Share",
+                onPress: async () => {
+                    try {
+                        await Share.share({ message: `Check out ${story.userName}'s story on Fuego` });
+                    } catch (err) {
+                        console.error("Share failed", err);
+                    }
+                },
+            },
+            {
+                text: "Unfollow",
+                style: "destructive",
+                onPress: async () => {
+                    try {
+                        await unfollowUser(story.userId);
+                    } catch (err) {
+                        console.error("unfollowUser failed", err);
+                    }
+                },
+            },
+            {
+                text: "Mute",
+                onPress: async () => {
+                    await muteStoryUser(story.userId);
+                    navigation.goBack();
+                },
+            },
+            { text: "Cancel", style: "cancel" },
+        ]);
     };
 
     if (loading || !story || !currentSubStory) return null;
@@ -108,7 +221,7 @@ export default function StoryScreen({ route }: any) {
             <Image
                 source={{ uri: currentSubStory.mediaUrl }}
                 style={styles.media}
-                resizeMode="cover"
+                contentFit="cover"
             />
 
             {/* Gradient overlay top */}
@@ -116,9 +229,17 @@ export default function StoryScreen({ route }: any) {
                 <ProgressBars total={total} current={currentIndex} progress={progress} />
                 <View style={styles.header}>
                     <Text style={styles.username}>{story.userName}</Text>
-                    <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                        <Ionicons name="close" size={24} color="#fff" />
-                    </TouchableOpacity>
+                    <View style={styles.headerActions}>
+                        <TouchableOpacity
+                            onPress={isOwner ? handleOpenMenu : handleOpenOtherMenu}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <Ionicons name="ellipsis-horizontal" size={22} color="#fff" />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                            <Ionicons name="close" size={24} color="#fff" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
 
@@ -137,6 +258,31 @@ export default function StoryScreen({ route }: any) {
                     color={liked ? "#EF4444" : "#fff"}
                 />
             </TouchableOpacity>
+
+            {/* Views/likes stats — owner only */}
+            {isOwner && (
+                <TouchableOpacity
+                    style={styles.statsRow}
+                    onPress={() =>
+                        Alert.alert(
+                            "Story Stats",
+                            `${viewers.length} view${viewers.length === 1 ? "" : "s"} · ${likers.length} like${likers.length === 1 ? "" : "s"}\n\n` +
+                                (viewers.length
+                                    ? `Viewed by: ${viewers.map((v) => v.users?.username).filter(Boolean).join(", ")}`
+                                    : "No views yet")
+                        )
+                    }
+                >
+                    <View style={styles.statItem}>
+                        <Ionicons name="eye-outline" size={18} color="#fff" />
+                        <Text style={styles.statText}>{viewers.length}</Text>
+                    </View>
+                    <View style={styles.statItem}>
+                        <Ionicons name="heart-outline" size={18} color="#fff" />
+                        <Text style={styles.statText}>{likers.length}</Text>
+                    </View>
+                </TouchableOpacity>
+            )}
 
             {/* Tap regions — prev / pause-hold / next */}
             <View style={styles.tapRow}>
@@ -171,6 +317,7 @@ const styles = StyleSheet.create({
     progressFill:  { height: "100%", backgroundColor: "#fff", borderRadius: 1 },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     username:  { color: "#fff", fontWeight: "700", fontSize: 15 },
+    headerActions: { flexDirection: "row", alignItems: "center", gap: 16 },
     captionWrap: {
         position: "absolute",
         bottom: 80,
@@ -179,6 +326,9 @@ const styles = StyleSheet.create({
     },
     caption: { color: "#fff", fontSize: 15, fontWeight: "500", textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
     likeBtn: { position: "absolute", bottom: 72, right: 20 },
+    statsRow: { position: "absolute", bottom: 76, left: 20, flexDirection: "row", gap: 14 },
+    statItem: { flexDirection: "row", alignItems: "center", gap: 4 },
+    statText: { color: "#fff", fontSize: 13, fontWeight: "600" },
     tapRow:  { ...StyleSheet.absoluteFillObject, flexDirection: "row", top: 100 },
     tapZone: { flex: 1, height: "100%" },
     tapZoneCenter: { flex: 2, height: "100%" },

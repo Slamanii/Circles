@@ -1,4 +1,5 @@
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image } from "expo-image";
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 
@@ -23,7 +24,7 @@ export function MediaGallery({ items, onPress }: Props) {
                     <Image
                         source={{ uri: item.thumbnail ?? item.uri }}
                         style={[styles.thumb, { backgroundColor: C.surface }]}
-                        resizeMode="cover"
+                        contentFit="cover"
                     />
                     {item.type === "video" && (
                         <View style={styles.playOverlay}>

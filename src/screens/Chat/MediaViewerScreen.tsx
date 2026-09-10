@@ -1,8 +1,8 @@
 import { Video, ResizeMode } from "expo-av";
+import { Image } from "expo-image";
 import { useRef } from "react";
 import {
     Dimensions,
-    Image,
     StatusBar,
     StyleSheet,
     TouchableOpacity,
@@ -33,7 +33,7 @@ export default function MediaViewerScreen({ route, navigation }: any) {
                 <Image
                     source={{ uri }}
                     style={styles.media}
-                    resizeMode="contain"
+                    contentFit="contain"
                 />
             )}
 

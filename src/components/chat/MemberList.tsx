@@ -1,4 +1,5 @@
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image } from "expo-image";
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 
@@ -6,7 +7,7 @@ type Member = {
     user_id: string;
     role: "admin" | "member";
     muted: boolean;
-    users?: { username: string; avatar: string };
+    users?: { username: string; avatar?: string | null };
 };
 
 type Props = {
@@ -27,7 +28,7 @@ export function MemberList({ members, currentUserId, onRemove, onMakeAdmin }: Pr
             scrollEnabled={false}
             renderItem={({ item }) => (
                 <View style={[styles.row, { borderBottomColor: C.border }]}>
-                    <Image source={{ uri: item.users?.avatar }} style={[styles.avatar, { backgroundColor: C.surface }]} />
+                    <Image source={{ uri: item.users?.avatar ?? undefined }} style={[styles.avatar, { backgroundColor: C.surface }]} />
                     <View style={styles.info}>
                         <Text style={[styles.name, { color: C.text }]}>{item.users?.username ?? "Unknown"}</Text>
                         <View style={styles.badges}>

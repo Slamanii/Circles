@@ -1,6 +1,6 @@
 import { initiatePaystackPay, paystackWebhook } from "../services/paystack";
 import { getPaymentOptions, confirmWalletPurchase } from "../services/walletPay";
-import { fetchUserCollectibles, getCollectibleProof, transferTicketP2P } from "../mod/collectibles";
+import { fetchUserCollectibles, getCollectibleProof, transferTicketInApp } from "../mod/collectibles";
 import { AuthRequest } from "../mod/auth"
 import { Response } from "express"
 
@@ -99,7 +99,7 @@ export async function transferTicketRouter(req: AuthRequest, res: Response) {
     }
 
     try {
-        const result = await transferTicketP2P({ assetId, senderUserId, recipientUserId });
+        const result = await transferTicketInApp({ assetId, senderUserId, recipientUserId });
         res.json(result);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";

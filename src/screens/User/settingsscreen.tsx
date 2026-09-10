@@ -7,6 +7,7 @@ import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 import { updateProfile } from "../../services/user";
 import { deleteAccount } from "../../services/login";
+import { deleteToken } from "../../services/secureStorage";
 import { resetBiometricSession } from "../Wallet/walletscreen";
 
 function dividerColor(theme: string) {
@@ -57,7 +58,8 @@ export default function SettingsScreen() {
 
     const logout = async () => {
         resetBiometricSession();
-        await AsyncStorage.multiRemove(["token", "user", "active_wallet"]);
+        await deleteToken();
+        await AsyncStorage.multiRemove(["user", "active_wallet"]);
         navigation.replace("login" as never);
     };
 
@@ -73,10 +75,11 @@ export default function SettingsScreen() {
                     onPress: async () => {
                         try {
                             await deleteAccount();
-                            await AsyncStorage.multiRemove(["token", "user", "active_wallet"]);
+                            await deleteToken();
+                            await AsyncStorage.multiRemove(["user", "active_wallet"]);
                             navigation.replace("login" as never);
-                        } catch (err: any) {
-                            Alert.alert("Error", err.message ?? "Please try again");
+                        } catch (err) {
+                            Alert.alert("Error", err instanceof Error ? err.message : "Please try again");
                         }
                     },
                 },

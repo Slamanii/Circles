@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
 import { useEffect, useState } from "react";
@@ -6,7 +7,6 @@ import { LocationPicker } from "../../components/LocationPicker";
 import {
     ActivityIndicator,
     Alert,
-    Image,
     ScrollView,
     StyleSheet,
     Text,
@@ -95,8 +95,8 @@ export default function EditProfileScreen() {
                 avatar: avatarUrl,
             });
             navigation.goBack();
-        } catch (err: any) {
-            Alert.alert("Failed to save", err.message ?? "Please try again");
+        } catch (err) {
+            Alert.alert("Failed to save", err instanceof Error ? err.message : "Please try again");
         } finally {
             setSaving(false);
         }

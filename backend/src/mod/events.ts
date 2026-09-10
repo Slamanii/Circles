@@ -125,17 +125,16 @@ export async function initializeEventOnchain({
         maxSupply: ticketSupply,
     });
 
-    // 5. Mint all cNFT tickets into treasury
-    const mintResult = await mintTickets({
-        supply: ticketSupply,
-        eventId: event.id,
-    });
+    // 5. Kick off cNFT minting into treasury in the background — not awaited,
+    // so this request doesn't block for the full mint duration. Resumable via
+    // runMintJob's atomic claim if the process crashes mid-run.
+    runMintJob(event.id);
 
     return {
         event: { ...event, group_id: group.id },
         group,
         onChainTx,
-        mint: mintResult,
+        mint: { status: "queued" },
     };
  }
 
@@ -206,29 +205,99 @@ async function mintOneCnft(eventId: string) {
     return { assetId: assetId.toBase58(), leafIndex, txSignature: tx };
 }
 
-export async function mintTickets({
-    supply,
-    eventId,
-}: {
-    supply: number;
-    eventId: string;
-}) {
+export async function mintTickets({ eventId }: { eventId: string }) {
     const results = [];
 
-    for (let i = 0; i < supply; i++) {
+    while (true) {
         try {
             results.push(await mintOneCnft(eventId));
-        } catch (err: any) {
-            if (err.message?.includes("TREE_FULL") || err.logs?.some((l: string) => l.includes("TreeFull"))) {
-                await createNewTree();
-                results.push(await mintOneCnft(eventId));
-            } else {
-                throw err;
+        } catch (err) {
+            const e = err as { message?: string; logs?: string[] };
+            if (e.message?.includes("Event sold out")) {
+                break;
             }
+            if (e.message?.includes("TREE_FULL") || e.logs?.some((l) => l.includes("TreeFull"))) {
+                await createNewTree();
+                continue;
+            }
+            throw err;
         }
     }
 
     return results;
+}
+
+/**
+ * Fire-and-forget: claims the event's mint job via the atomic `claim_event_mint`
+ * RPC (a no-op if another run already owns it, or it's already completed) and
+ * runs `mintTickets` to completion, persisting the outcome. Never awaited by
+ * callers — detaches minting from the HTTP request lifecycle. Safe to call
+ * repeatedly for the same event; mintTickets resumes from on-chain state.
+ */
+export function runMintJob(eventId: string): void {
+    const workerId = `${process.pid}-${Date.now()}`;
+
+    (async () => {
+        const { data: claimed, error: claimError } = await supabase.rpc("claim_event_mint", {
+            p_event_id: eventId,
+            p_worker_id: workerId,
+        });
+
+        if (claimError) {
+            console.error(`Failed to claim mint job for event ${eventId}:`, claimError);
+            return;
+        }
+        if (!claimed) return;
+
+        try {
+            await mintTickets({ eventId });
+            await supabase
+                .from("events")
+                .update({
+                    mint_status: "completed",
+                    mint_completed_at: new Date().toISOString(),
+                    mint_lock_owner: null,
+                    mint_lock_acquired_at: null,
+                })
+                .eq("id", eventId);
+        } catch (err) {
+            await supabase
+                .from("events")
+                .update({
+                    mint_status: "failed",
+                    mint_last_error: err instanceof Error ? err.message : String(err),
+                    mint_lock_owner: null,
+                    mint_lock_acquired_at: null,
+                })
+                .eq("id", eventId);
+        }
+    })().catch((err) => {
+        console.error(`Unhandled error in mint job for event ${eventId}:`, err);
+    });
+}
+
+/**
+ * Re-queues any event mint job that's pending, failed, or stuck in_progress
+ * with a stale lock (owner crashed without releasing it). Safe to call
+ * anytime — runMintJob's atomic claim can't race an organic in-flight run.
+ */
+export async function resumeStuckMints() {
+    const staleCutoff = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+
+    const { data: stuck, error } = await supabase
+        .from("events")
+        .select("id")
+        .lt("mint_attempts", 5)
+        .or(`mint_status.eq.pending,mint_status.eq.failed,and(mint_status.eq.in_progress,mint_lock_acquired_at.lt.${staleCutoff})`);
+
+    if (error) {
+        console.error("Failed to query stuck mints:", error);
+        return;
+    }
+
+    for (const event of stuck ?? []) {
+        runMintJob(event.id);
+    }
 }
 
  export async function createNewTree() {
@@ -392,6 +461,35 @@ export async function getEventById(eventId: string) {
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function getEventStats(eventId: string, userId: string) {
+  const { data: event, error: eventError } = await supabase
+    .from("events")
+    .select("id, creator_id, title, ticket_supply, ticket_price")
+    .eq("id", eventId)
+    .single();
+
+  if (eventError || !event) throw new Error("Event not found");
+  if (event.creator_id !== userId) throw new Error("Unauthorized");
+
+  const [likesResult, mintedResult, soldResult] = await Promise.all([
+    supabase.from("event_likes").select("id", { count: "exact", head: true }).eq("event_id", eventId),
+    supabase.from("collectibles").select("id", { count: "exact", head: true }).eq("event_id", eventId),
+    supabase.from("collectibles").select("id", { count: "exact", head: true }).eq("event_id", eventId).neq("custodian", "treasury"),
+  ]);
+
+  const sold = soldResult.count ?? 0;
+
+  return {
+    title: event.title,
+    ticketSupply: event.ticket_supply,
+    ticketPrice: event.ticket_price,
+    totalLikes: likesResult.count ?? 0,
+    minted: mintedResult.count ?? 0,
+    sold,
+    revenue: sold * (event.ticket_price ?? 0),
+  };
 }
 
 export async function fetchEvents(limit: number = 50, offset: number = 0) {

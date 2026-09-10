@@ -27,8 +27,8 @@ export default function SendTicketScreen({ route }: any) {
 
             Alert.alert("Sent!", `Ticket sent to @${recipientUsername}`);
             navigation.goBack();
-        } catch (err: any) {
-            Alert.alert("Transfer failed", err.message ?? "Unknown error");
+        } catch (err) {
+            Alert.alert("Transfer failed", err instanceof Error ? err.message : "Unknown error");
         } finally {
             setLoading(false);
         }

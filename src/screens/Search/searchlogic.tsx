@@ -1,8 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { useEffect, useState } from "react";
-import { fetchDiscoverStories, fetchStories } from "../../services/story";
-import { searchUsers } from "../../services/user";
+import { fetchStories, fetchStoriesPreview } from "../../services/story";
+import { getMutedStoryUsers } from "../Stories/storieslogic";
+import { searchUsers, UserSummary } from "../../services/user";
+import { NormalizedStory } from "../../../shared/Types";
 
 const RECENTS_KEY = "search_recents";
 const MAX_RECENTS = 8;
@@ -11,15 +13,23 @@ export default function useSearchLogic() {
     const navigation = useNavigation<any>();
 
     const [query, setQueryRaw] = useState("");
-    const [results, setResults] = useState<any[]>([]);
-    const [stories, setStories] = useState<any[]>([]);
-    const [discoverStories, setDiscoverStories] = useState<any[]>([]);
+    const [results, setResults] = useState<UserSummary[]>([]);
+    const [stories, setStories] = useState<NormalizedStory[]>([]);
+    const [previewStories, setPreviewStories] = useState<NormalizedStory[]>([]);
     const [loading, setLoading] = useState(false);
     const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
+    const loadStories = async () => {
+        const [data, mutedIds] = await Promise.all([
+            fetchStories().catch(() => []),
+            getMutedStoryUsers(),
+        ]);
+        setStories((data ?? []).filter((s) => !mutedIds.includes(s.userId)));
+    };
+
     useEffect(() => {
-        fetchStories().then((data) => setStories(data ?? [])).catch(console.error);
-        fetchDiscoverStories().then((data) => setDiscoverStories(data ?? [])).catch(console.error);
+        loadStories().catch(console.error);
+        fetchStoriesPreview().then((data) => setPreviewStories(data ?? [])).catch(console.error);
         AsyncStorage.getItem(RECENTS_KEY)
             .then((raw) => setRecentSearches(raw ? JSON.parse(raw) : []))
             .catch(console.error);
@@ -70,12 +80,11 @@ export default function useSearchLogic() {
     };
 
     const reload = async () => {
-        const [s, d] = await Promise.all([
-            fetchStories().catch(() => []),
-            fetchDiscoverStories().catch(() => []),
+        const [d] = await Promise.all([
+            fetchStoriesPreview().catch(() => []),
+            loadStories(),
         ]);
-        setStories(s ?? []);
-        setDiscoverStories(d ?? []);
+        setPreviewStories(d ?? []);
     };
 
     return {
@@ -83,7 +92,7 @@ export default function useSearchLogic() {
         setQuery,
         results,
         stories,
-        discoverStories,
+        previewStories,
         loading,
         recentSearches,
         onUserPress,

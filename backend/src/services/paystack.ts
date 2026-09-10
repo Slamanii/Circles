@@ -95,12 +95,15 @@ export async function initiatePaystackPay({
     }
 }
 
-export async function paystackWebhook(req: Request) {
-    // Block forged webhook calls
+export async function paystackWebhook(req: Request & { rawBody?: Buffer }) {
+    // Block forged webhook calls — verified against the raw request bytes,
+    // since re-serializing req.body can drift from what Paystack actually signed
     const signature = req.headers["x-paystack-signature"] as string;
+    if (!req.rawBody) throw new Error("Missing raw body for webhook verification");
+
     const hash = crypto
         .createHmac("sha512", PAYSTACK_SECRET)
-        .update(JSON.stringify(req.body))
+        .update(req.rawBody)
         .digest("hex");
 
     if (hash !== signature) throw new Error("Invalid webhook signature");

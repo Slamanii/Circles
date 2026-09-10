@@ -1,11 +1,11 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
 import { useState } from "react";
 import {
     ActivityIndicator,
     Alert,
-    Image,
     Platform,
     ScrollView,
     StyleSheet,
@@ -114,8 +114,8 @@ export default function CreateEventScreen() {
             Alert.alert("Event created!", "Your tickets are being minted.", [
                 { text: "OK", onPress: () => navigation.goBack() },
             ]);
-        } catch (err: any) {
-            Alert.alert("Failed to create event", err.message ?? "Unknown error");
+        } catch (err) {
+            Alert.alert("Failed to create event", err instanceof Error ? err.message : "Unknown error");
         } finally {
             setLoading(false);
         }

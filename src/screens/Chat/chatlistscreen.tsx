@@ -1,4 +1,4 @@
-import { FlatList, View } from "react-native";
+import { FlatList, RefreshControl, View } from "react-native";
 import { ChatListHeader } from "../../components/chat/ChatListHeader";
 import { ChatPreviewItem } from "../../components/chat/ChatPreviewItem";
 import { useChatListLogic } from "./chatcontrolpanelscreen";
@@ -7,7 +7,10 @@ import { getColors } from "../../shared/theme";
 
 export function ChatListScreen() {
     const C = getColors(useAppTheme().theme);
-    const { username, groups, archiveFilter, onFilterChange, onToggleSelection, onGroupPress, onBack } = useChatListLogic();
+    const {
+        username, groups, unreadCounts, refreshing, onRefresh,
+        archiveFilter, onFilterChange, onToggleSelection, onGroupPress, onBack,
+    } = useChatListLogic();
 
     return (
         <View style={{ flex: 1, backgroundColor: C.background }}>
@@ -21,6 +24,9 @@ export function ChatListScreen() {
             <FlatList
                 data={groups}
                 keyExtractor={(item) => item.groups?.id ?? item.groupId}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.textSecondary} />
+                }
                 renderItem={({ item }) => {
                     const group = item.groups ?? item;
                     const lastMsg = group.messages?.[0];
@@ -32,6 +38,7 @@ export function ChatListScreen() {
                             image={group.group_image ?? group.groupimage ?? null}
                             pinned={false}
                             muted={false}
+                            unreadCount={unreadCounts[group.id] ?? 0}
                             onPress={() => onGroupPress(group)}
                             onLongPress={() => {}}
                         />

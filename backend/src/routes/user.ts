@@ -1,4 +1,4 @@
-import { getUser, getUserProfile, searchUsers, fetchFollowers, fetchFollowing, followUser, fetchEventLikes, fetchHostedEvents, fetchLikedEvents, updateProfile } from "../mod/users"
+import { getUser, getUserProfile, searchUsers, fetchFollowers, fetchFollowing, followUser, unfollowUser, fetchEventLikes, fetchHostedEvents, fetchLikedEvents, updateProfile } from "../mod/users"
 import { Response } from 'express'
 import { AuthRequest } from "../mod/auth"
 
@@ -38,34 +38,48 @@ export async function updateProfileRouter(req: AuthRequest, res: Response) {
 
 export async function fetchFollowersRouter(req: AuthRequest, res: Response) {
 
-    const followers = await fetchFollowers(req.user!.id)
+    const targetId = req.body?.userId || req.user!.id;
+    const { limit, offset } = req.body ?? {};
+    const followers = await fetchFollowers(targetId, req.user!.id, limit, offset)
 
     res.json(followers)
 }
 
 export async function fetchFollowingRouter(req: AuthRequest, res: Response) {
 
-    const followers = await fetchFollowing(req.user!.id)
+    const targetId = req.body?.userId || req.user!.id;
+    const { limit, offset } = req.body ?? {};
+    const following = await fetchFollowing(targetId, req.user!.id, limit, offset)
 
-    res.json(followers)
+    res.json(following)
 }
 
 export async function followUserRouter(req: AuthRequest, res: Response) {
 
     const userId = req.user!.id;
-    const followingData = req.body;
+    const { followingId } = req.body;
 
-    const follow = await followUser(userId, followingData)
+    const follow = await followUser(userId, followingId)
 
     res.json(follow)
+}
+
+export async function unfollowUserRouter(req: AuthRequest, res: Response) {
+
+    const userId = req.user!.id;
+    const { followingId } = req.body;
+
+    const result = await unfollowUser(userId, followingId)
+
+    res.json(result)
 }
 
 export async function fetchEventLikesRouter(req: AuthRequest, res: Response) {
 
     const userId = req.user!.id;
-    const eventId = req.body;
+    const { eventId } = req.body;
 
-    const likes = await fetchEventLikes(userId, eventId)
+    const likes = await fetchEventLikes(eventId, userId)
 
     res.json(likes)
 }

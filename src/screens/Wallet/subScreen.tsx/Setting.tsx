@@ -24,6 +24,10 @@ import {
     getPreferredCurrency,
     setPreferredCurrency,
 } from "../../../services/currency";
+import { clearActiveWallet, exportWalletSecret } from "../../../hooks/useWalletConnection";
+import { useStepUp } from "../../../hooks/useStepUp";
+import PasswordPromptModal from "../../../components/PasswordPromptModal";
+import ExportSecretModal from "../../../components/ExportSecretModal";
 
 const BG      = "#2E2D2D";
 const SURFACE = "#3A3939";
@@ -135,6 +139,9 @@ export default function WalletSettingsScreen() {
     const [currency, setCurrency] = useState<Currency>("USD");
     const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
 
+    const { requestStepUp, promptProps } = useStepUp();
+    const [secretData, setSecretData] = useState<{ secret: string; format: "mnemonic" | "legacy_key" } | null>(null);
+
     useEffect(() => {
         async function load() {
             const [available, cur] = await Promise.all([
@@ -172,6 +179,17 @@ export default function WalletSettingsScreen() {
         await setPreferredCurrency(c);
         setCurrency(c);
         setCurrencyModalVisible(false);
+    };
+
+    const handleExportKey = async () => {
+        try {
+            const stepUpToken = await requestStepUp("export-secret");
+            const result = await exportWalletSecret(stepUpToken);
+            setSecretData(result);
+        } catch (err) {
+            if (err instanceof Error && err.message === "Cancelled") return;
+            Alert.alert("Export failed", err instanceof Error ? err.message : "Could not export key");
+        }
     };
 
     return (
@@ -224,13 +242,16 @@ export default function WalletSettingsScreen() {
                         icon="key-outline"
                         label="Export Private Key"
                         sublabel="View and back up your custodial wallet key"
-                        onPress={() => {/* TODO: export key screen */}}
+                        onPress={handleExportKey}
                     />
                     <SettingRow
                         icon="swap-horizontal-outline"
                         label="Switch Wallet"
-                        sublabel="Connect Phantom or change active wallet"
-                        onPress={() => {/* TODO: wallet switch screen */}}
+                        sublabel="Change or link the active wallet"
+                        onPress={async () => {
+                            await clearActiveWallet();
+                            navigation.navigate("WalletMain");
+                        }}
                         isLast
                     />
                 </View>
@@ -266,6 +287,14 @@ export default function WalletSettingsScreen() {
                 selected={currency}
                 onSelect={handleCurrencySelect}
                 onClose={() => setCurrencyModalVisible(false)}
+            />
+
+            <PasswordPromptModal {...promptProps} />
+            <ExportSecretModal
+                visible={!!secretData}
+                secret={secretData?.secret ?? null}
+                format={secretData?.format ?? null}
+                onClose={() => setSecretData(null)}
             />
         </View>
     );

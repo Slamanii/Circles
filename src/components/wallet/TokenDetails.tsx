@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image } from "expo-image";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { TokenDetailsType } from "../../../shared/Types";
 import { formatFiat } from "../../services/currency";
 

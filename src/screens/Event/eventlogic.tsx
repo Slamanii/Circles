@@ -60,8 +60,8 @@ export function useEventLogic() {
             if (result?.checkoutUrl) {
                 await Linking.openURL(result.checkoutUrl);
             }
-        } catch (err: any) {
-            Alert.alert("Payment failed", err.message ?? "Please try again");
+        } catch (err) {
+            Alert.alert("Payment failed", err instanceof Error ? err.message : "Please try again");
         }
     };
 
@@ -76,9 +76,9 @@ export function useEventLogic() {
         try {
             const data = await getPaymentOptions(eventId, quantity);
             setTokenOptions(data.options);
-        } catch (err: any) {
+        } catch (err) {
             setPickerVisible(false);
-            Alert.alert("Failed to fetch prices", err.message ?? "Please try again");
+            Alert.alert("Failed to fetch prices", err instanceof Error ? err.message : "Please try again");
         } finally {
             setPickerLoading(false);
         }
@@ -115,8 +115,8 @@ export function useEventLogic() {
 
             await confirmWalletPurchase(eventId, txSig, option.mint, quantity);
             Alert.alert("Success", `${quantity} ticket${quantity > 1 ? "s" : ""} purchased!`);
-        } catch (err: any) {
-            Alert.alert("Payment failed", err.message ?? "Please try again");
+        } catch (err) {
+            Alert.alert("Payment failed", err instanceof Error ? err.message : "Please try again");
         }
     };
 

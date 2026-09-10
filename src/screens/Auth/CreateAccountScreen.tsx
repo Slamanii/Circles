@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Login } from "../../services/login";
 import { Colors } from "../../shared/theme";
+import PasswordInput from "../../components/PasswordInput";
 
 type Props = {
     onSuccess: (user: any, token: string) => void;
@@ -102,8 +103,8 @@ export default function CreateAccountScreen({ onSuccess, onGoToSignIn }: Props) 
                     "This email is already registered. Please sign in.",
                 );
             }
-        } catch (err: any) {
-            Alert.alert("Sign up failed", err.message ?? "Please try again");
+        } catch (err) {
+            Alert.alert("Sign up failed", err instanceof Error ? err.message : "Please try again");
         } finally {
             setLoading(false);
         }
@@ -136,22 +137,16 @@ export default function CreateAccountScreen({ onSuccess, onGoToSignIn }: Props) 
                             keyboardType="email-address"
                             returnKeyType="next"
                         />
-                        <TextInput
-                            style={styles.input}
+                        <PasswordInput
                             placeholder="Password"
-                            placeholderTextColor="#555"
                             value={password}
                             onChangeText={setPassword}
-                            secureTextEntry
                             returnKeyType="next"
                         />
-                        <TextInput
-                            style={styles.input}
+                        <PasswordInput
                             placeholder="Confirm password"
-                            placeholderTextColor="#555"
                             value={confirm}
                             onChangeText={setConfirm}
-                            secureTextEntry
                             returnKeyType="done"
                             onSubmitEditing={handleCreate}
                         />

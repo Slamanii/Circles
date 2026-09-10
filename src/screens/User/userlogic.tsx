@@ -7,9 +7,11 @@ import {
     fetchHostedEvents,
     fetchLikedEvents,
     followUser,
+    unfollowUser,
     getUserProfile,
 } from "../../services/user";
 import { fetchStoryByUser } from "../../services/story";
+import { NormalizedStory, RawEventSummary } from "../../../shared/Types";
 
 const PAGE_SIZE = 5;
 
@@ -19,6 +21,7 @@ export function useUserLogic(followingId?: string) {
     const [refreshing, setRefreshing] = useState(false);
     const [followed, setFollowed] = useState(false);
     const [isOwnProfile, setIsOwnProfile] = useState(false);
+    const [profileUserId, setProfileUserId] = useState<string | undefined>(followingId);
     const [username, setUsername] = useState("");
     const [displayName, setDisplayName] = useState("");
     const [avatar, setAvatar] = useState<string | null>(null);
@@ -30,9 +33,9 @@ export function useUserLogic(followingId?: string) {
     const [isPrivate, setIsPrivate] = useState(false);
     const [canViewContent, setCanViewContent] = useState(true);
 
-    const [hostedEvents, setHostedEvents] = useState<any[]>([]);
-    const [likedEvents, setLikedEvents] = useState<any[]>([]);
-    const [userStories, setUserStories] = useState<any[]>([]);
+    const [hostedEvents, setHostedEvents] = useState<RawEventSummary[]>([]);
+    const [likedEvents, setLikedEvents] = useState<RawEventSummary[]>([]);
+    const [userStories, setUserStories] = useState<NormalizedStory[]>([]);
     const [hostedVisible, setHostedVisible] = useState(PAGE_SIZE);
     const [likedVisible, setLikedVisible] = useState(PAGE_SIZE);
 
@@ -58,6 +61,7 @@ export function useUserLogic(followingId?: string) {
             setIsPrivate(profileData.private ?? false);
             setCanViewContent(profileData.canViewContent ?? true);
             setIsOwnProfile(!followingId || followingId === storedUser?.id);
+            setProfileUserId(followingId ?? storedUser?.id);
 
             const [events, liked, stories] = await Promise.all([
                 fetchHostedEvents(followingId).catch(() => []),
@@ -89,7 +93,12 @@ export function useUserLogic(followingId?: string) {
         catch { setFollowed(false); }
     };
 
-    const unfollow = () => setFollowed(false);
+    const unfollow = async () => {
+        if (!followingId || isOwnProfile) return;
+        setFollowed(false);
+        try { await unfollowUser(followingId); }
+        catch { setFollowed(true); }
+    };
 
     const handleShare = async () => {
         try {
@@ -103,7 +112,7 @@ export function useUserLogic(followingId?: string) {
 
     return {
         username, displayName, avatar, bio, link1, link2,
-        followers, following,
+        followers, following, profileUserId,
         hostedEvents, likedEvents, userStories,
         hostedVisible, likedVisible,
         showMoreHosted, showMoreLiked,
