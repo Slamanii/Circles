@@ -11,6 +11,8 @@ import {
     getUserProfile,
 } from "../../services/user";
 import { fetchStoryByUser } from "../../services/story";
+import { AppNotification } from "../../services/notifications";
+import { getSocket } from "../../services/socket";
 import { NormalizedStory, RawEventSummary } from "../../../shared/Types";
 
 const PAGE_SIZE = 5;
@@ -82,6 +84,19 @@ export function useUserLogic(followingId?: string) {
         await load();
         setRefreshing(false);
     }, [followingId]);
+
+    // A notification only ever reaches the signed-in user's own room, so a
+    // follow_new event here can only mean "someone followed me" — bump the
+    // live count instead of waiting for a manual pull-to-refresh.
+    useEffect(() => {
+        if (!isOwnProfile) return;
+        const s = getSocket();
+        const handler = (n: AppNotification) => {
+            if (n.type === "follow_new") setFollowers(f => f + 1);
+        };
+        s?.on("notification", handler);
+        return () => { s?.off("notification", handler); };
+    }, [isOwnProfile]);
 
     const showMoreHosted = () => setHostedVisible((v) => v + PAGE_SIZE);
     const showMoreLiked  = () => setLikedVisible((v) => v + PAGE_SIZE);

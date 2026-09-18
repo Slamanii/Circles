@@ -7,6 +7,8 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, Touchabl
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 import { fetchFollowers, fetchFollowing, followUser, unfollowUser, FollowRow } from "../../services/user";
+import { AppNotification } from "../../services/notifications";
+import { getSocket } from "../../services/socket";
 
 type Mode = "followers" | "following";
 const PAGE_SIZE = 30;
@@ -43,6 +45,15 @@ export default function FollowListScreen({ route }: any) {
             .catch(() => {});
         load().finally(() => setLoading(false));
     }, [load]);
+
+    useEffect(() => {
+        const s = getSocket();
+        const handler = (n: AppNotification) => {
+            if (n.type === "follow_new" && mode === "followers" && userId === currentUserId) load();
+        };
+        s?.on("notification", handler);
+        return () => { s?.off("notification", handler); };
+    }, [mode, userId, currentUserId, load]);
 
     const onRefresh = async () => {
         setRefreshing(true);

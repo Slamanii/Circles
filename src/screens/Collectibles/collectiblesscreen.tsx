@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { useState } from "react";
 import {
     ActivityIndicator,
@@ -21,13 +22,36 @@ type CardProps = {
     isPinned: (id: string) => boolean;
 };
 
+function medalColorForTier(tierName: string | undefined): string {
+    if (tierName === "VIP++") return "#FFD700";
+    if (tierName === "VIP") return "#C0C0C0";
+    return "#22C55E";
+}
+
 function TicketCard({ item, navigation, isPinned }: CardProps) {
+    const medalColor = medalColorForTier(item.tier?.name);
+
     return (
         <TouchableOpacity
             style={[styles.ticketCard, isPinned(item.id) && styles.cardPinned]}
             activeOpacity={0.85}
             onPress={() => navigation.navigate("TicketInfo", { ticket: item })}
         >
+            <View style={styles.flyerWrap}>
+                <View style={styles.flyerTilt}>
+                    {item.events?.flyer_card ? (
+                        <Image
+                            source={{ uri: item.events.flyer_card }}
+                            style={styles.flyerImage}
+                            contentFit="cover"
+                        />
+                    ) : null}
+                    <View style={styles.medalBadge}>
+                        <Ionicons name="medal" size={14} color={medalColor} />
+                    </View>
+                </View>
+            </View>
+
             <View style={styles.cardInner}>
                 {isPinned(item.id) && (
                     <Ionicons name="pin" size={12} color={Colors.accent} style={styles.pinIcon} />
@@ -202,6 +226,32 @@ const styles = StyleSheet.create({
     cardPinned: {
         borderWidth: 2,
         borderColor: Colors.accent,
+    },
+    flyerWrap: {
+        ...StyleSheet.absoluteFillObject,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    flyerTilt: {
+        width: "45%",
+        aspectRatio: 16 / 9,
+        transform: [{ rotate: "42deg" }],
+    },
+    flyerImage: {
+        width: "100%",
+        height: "100%",
+        borderRadius: 4,
+    },
+    medalBadge: {
+        position: "absolute",
+        top: -8,
+        right: -8,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: "rgba(0,0,0,0.6)",
+        alignItems: "center",
+        justifyContent: "center",
     },
     cardInner: {
         flex: 1,

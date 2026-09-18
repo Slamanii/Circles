@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { Audio } from "expo-av";
@@ -9,7 +10,97 @@ import {
 } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
-import { Message } from "../../../shared/Types";
+import { Message, PollOption } from "../../../shared/Types";
+
+function formatFileSize(bytes?: number) {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// ─── File bubble ──────────────────────────────────────────────────────────────
+function FileBubble({ filename, size, isMine, C }: { filename?: string; size?: number; isMine: boolean; C: any }) {
+    return (
+        <View style={styles.fileBubble}>
+            <Ionicons name="document-text-outline" size={28} color={isMine ? "#fff" : C.accent} />
+            <View style={styles.fileInfo}>
+                <Text style={[isMine ? styles.textMine : styles.textOther, styles.fileName]} numberOfLines={1}>
+                    {filename ?? "File"}
+                </Text>
+                {!!size && (
+                    <Text style={[styles.fileSize, { color: isMine ? "#DBEAFE" : C.textMuted }]}>
+                        {formatFileSize(size)}
+                    </Text>
+                )}
+            </View>
+        </View>
+    );
+}
+
+// ─── Poll bubble ──────────────────────────────────────────────────────────────
+function PollBubble({
+    question, options, votes, isMine, currentUserId, onVote, C,
+}: {
+    question: string;
+    options: PollOption[];
+    votes: { user_id: string; option_id: string }[];
+    isMine: boolean;
+    currentUserId: string | null;
+    onVote: (optionIds: string[]) => void;
+    C: any;
+}) {
+    const totalVoters = new Set(votes.map(v => v.user_id)).size;
+    const mySelected = new Set(votes.filter(v => v.user_id === currentUserId).map(v => v.option_id));
+
+    const countFor = (optionId: string) => votes.filter(v => v.option_id === optionId).length;
+
+    const toggleOption = (optionId: string) => {
+        const next = new Set(mySelected);
+        next.has(optionId) ? next.delete(optionId) : next.add(optionId);
+        onVote(Array.from(next));
+    };
+
+    return (
+        <View style={styles.pollBubble}>
+            <Text style={[styles.pollQuestion, isMine ? styles.textMine : styles.textOther]}>{question}</Text>
+            {options.map(opt => {
+                const count = countFor(opt.id);
+                const pct = totalVoters > 0 ? Math.round((count / totalVoters) * 100) : 0;
+                const picked = mySelected.has(opt.id);
+                return (
+                    <TouchableOpacity
+                        key={opt.id}
+                        style={[
+                            styles.pollOption,
+                            { borderColor: picked ? C.accent : (isMine ? "rgba(255,255,255,0.4)" : C.border) },
+                        ]}
+                        onPress={() => toggleOption(opt.id)}
+                    >
+                        <View style={[
+                            styles.pollBar,
+                            { width: `${pct}%`, backgroundColor: isMine ? "rgba(255,255,255,0.25)" : C.accent + "33" },
+                        ]} />
+                        <Ionicons
+                            name={picked ? "checkmark-circle" : "ellipse-outline"}
+                            size={16}
+                            color={picked ? C.accent : (isMine ? "#fff" : C.textMuted)}
+                        />
+                        <Text style={[styles.pollOptionText, isMine ? styles.textMine : styles.textOther]}>
+                            {opt.text}
+                        </Text>
+                        <Text style={[styles.pollOptionPct, { color: isMine ? "#DBEAFE" : C.textMuted }]}>
+                            {count > 0 ? `${pct}%` : ""}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            })}
+            <Text style={[styles.pollVoters, { color: isMine ? "#DBEAFE" : C.textMuted }]}>
+                {totalVoters} vote{totalVoters === 1 ? "" : "s"}
+            </Text>
+        </View>
+    );
+}
 
 // ─── Audio bubble ─────────────────────────────────────────────────────────────
 function AudioBubble({ uri, isMine }: { uri: string; isMine: boolean }) {
@@ -103,20 +194,34 @@ type Props = {
     onPin: () => void;
     onReply: () => void;
     onStar: () => void;
+    onSelect: () => void;
+    onVotePoll: (optionIds: string[]) => void;
+    currentUserId: string | null;
+    selectionMode: boolean;
+    selected: boolean;
+    onToggleSelect: () => void;
 };
 
 const STATUS_ICON: Record<string, string> = {
     sending: "🕐", sent: "✓", delivered: "✓✓", read: "✓✓",
 };
 
-export function MessageBubble({ message, onDelete, onShare, onPin, onReply, onStar }: Props) {
+export function MessageBubble({
+    message, onDelete, onShare, onPin, onReply, onStar, onSelect, onVotePoll, currentUserId,
+    selectionMode, selected, onToggleSelect,
+}: Props) {
     const C = getColors(useAppTheme().theme);
     const [menuVisible, setMenuVisible] = useState(false);
     const { isMine, type, deleted, isPinned, status, starred } = message;
 
     const handleLongPress = async () => {
+        if (selectionMode) return;
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setMenuVisible(true);
+    };
+
+    const handlePress = () => {
+        if (selectionMode) onToggleSelect();
     };
 
     const handleCopy = async () => {
@@ -134,6 +239,7 @@ export function MessageBubble({ message, onDelete, onShare, onPin, onReply, onSt
         { label: starred ? "Unstar" : "Star", icon: starred ? "⭐" : "☆", onPress: onStar },
         { label: isPinned ? "Unpin" : "Pin", icon: "📌", onPress: onPin },
         { label: "Share",  icon: "✈️",  onPress: onShare },
+        { label: "Select", icon: "☑️",  onPress: onSelect },
         { label: "Delete", icon: "🗑️",  onPress: onDelete, danger: true },
     ];
 
@@ -141,10 +247,19 @@ export function MessageBubble({ message, onDelete, onShare, onPin, onReply, onSt
         <>
             <TouchableOpacity
                 onLongPress={handleLongPress}
+                onPress={handlePress}
                 delayLongPress={350}
                 activeOpacity={0.85}
                 style={[styles.row, isMine ? styles.rowMine : styles.rowOther]}
             >
+                {selectionMode && isMine && (
+                    <Ionicons
+                        name={selected ? "checkmark-circle" : "ellipse-outline"}
+                        size={22}
+                        color={selected ? C.accent : C.textMuted}
+                        style={styles.selectDot}
+                    />
+                )}
                 <View style={[
                     styles.bubble,
                     isMine ? styles.bubbleMine : [styles.bubbleOther, { backgroundColor: C.surface }],
@@ -159,7 +274,7 @@ export function MessageBubble({ message, onDelete, onShare, onPin, onReply, onSt
                         <Text style={[styles.deleted, { color: C.textMuted }]}>This message was deleted</Text>
                     ) : type === "text" ? (
                         <MentionText content={message.content} isMine={isMine} accent={C.accent} />
-                    ) : type === "image" ? (
+                    ) : type === "image" || type === "gif" ? (
                         <Image source={{ uri: message.media?.uri ?? message.content }} style={styles.image} />
                     ) : type === "video" ? (
                         <View style={styles.videoWrap}>
@@ -168,6 +283,18 @@ export function MessageBubble({ message, onDelete, onShare, onPin, onReply, onSt
                         </View>
                     ) : type === "audio" ? (
                         <AudioBubble uri={message.media?.uri ?? message.content} isMine={isMine} />
+                    ) : type === "file" ? (
+                        <FileBubble filename={message.media?.filename} size={message.media?.size} isMine={isMine} C={C} />
+                    ) : type === "poll" ? (
+                        <PollBubble
+                            question={message.content}
+                            options={message.media?.options ?? []}
+                            votes={message.pollVotes ?? []}
+                            isMine={isMine}
+                            currentUserId={currentUserId}
+                            onVote={onVotePoll}
+                            C={C}
+                        />
                     ) : null}
 
                     <View style={styles.meta}>
@@ -182,6 +309,14 @@ export function MessageBubble({ message, onDelete, onShare, onPin, onReply, onSt
                         )}
                     </View>
                 </View>
+                {selectionMode && !isMine && (
+                    <Ionicons
+                        name={selected ? "checkmark-circle" : "ellipse-outline"}
+                        size={22}
+                        color={selected ? C.accent : C.textMuted}
+                        style={styles.selectDot}
+                    />
+                )}
             </TouchableOpacity>
 
             <ActionMenu
@@ -223,6 +358,25 @@ const styles = StyleSheet.create({
     audioWave:     { flex: 1, height: 3, borderRadius: 2 },
     audioWaveMine: { backgroundColor: "rgba(255,255,255,0.5)" },
     audioWaveOther:{ backgroundColor: "#475569" },
+    // file
+    fileBubble:    { flexDirection: "row", alignItems: "center", gap: 10, minWidth: 160, maxWidth: 220 },
+    fileInfo:      { flex: 1 },
+    fileName:      { fontWeight: "600" },
+    fileSize:      { fontSize: 11, marginTop: 2 },
+    // poll
+    pollBubble:    { minWidth: 220, maxWidth: 260, gap: 8 },
+    pollQuestion:  { fontWeight: "700", marginBottom: 4 },
+    pollOption:    {
+        flexDirection: "row", alignItems: "center", gap: 8,
+        borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8,
+        overflow: "hidden",
+    },
+    pollBar:       { position: "absolute", left: 0, top: 0, bottom: 0, borderRadius: 10 },
+    pollOptionText:{ flex: 1, fontSize: 14 },
+    pollOptionPct: { fontSize: 12, fontWeight: "600" },
+    pollVoters:    { fontSize: 11, marginTop: 2 },
+    // selection
+    selectDot:     { alignSelf: "center", marginHorizontal: 8 },
     // meta
     meta:          { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", marginTop: 4, gap: 4 },
     starIcon:      { fontSize: 10 },

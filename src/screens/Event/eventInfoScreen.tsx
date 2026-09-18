@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useNavigation } from "@react-navigation/native";
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors, ThemeColors } from "../../shared/theme";
 import { fetchEventStats } from "../../services/user";
+import { AppNotification } from "../../services/notifications";
+import { getSocket } from "../../services/socket";
 import { EventStats } from "../../../shared/Types";
 
 export default function EventInfoScreen({ route }: any) {
@@ -15,14 +17,41 @@ export default function EventInfoScreen({ route }: any) {
 
     const [stats, setStats] = useState<EventStats | null>(null);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetchEventStats(eventId)
-            .then(setStats)
-            .catch((err) => setError(err?.message ?? "Failed to load stats"))
-            .finally(() => setLoading(false));
+    const load = useCallback(async () => {
+        try {
+            setStats(await fetchEventStats(eventId));
+            setError(null);
+        } catch (err: any) {
+            setError(err?.message ?? "Failed to load stats");
+        }
     }, [eventId]);
+
+    useEffect(() => { load().finally(() => setLoading(false)); }, [load]);
+
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await load();
+        setRefreshing(false);
+    };
+
+    // Organizer stats change from other users' actions (likes, mint completing)
+    // — refresh live instead of only on manual pull-to-refresh.
+    useEffect(() => {
+        const s = getSocket();
+        const handler = (n: AppNotification) => {
+            if (
+                (n.type === "event_liked" || n.type === "event_mint_complete" || n.type === "event_mint_failed") &&
+                (n.reference_id === eventId || n.metadata?.eventId === eventId)
+            ) {
+                load();
+            }
+        };
+        s?.on("notification", handler);
+        return () => { s?.off("notification", handler); };
+    }, [eventId, load]);
 
     return (
         <View style={[styles.container, { backgroundColor: C.background }]}>
@@ -39,7 +68,12 @@ export default function EventInfoScreen({ route }: any) {
             ) : error || !stats ? (
                 <Text style={[styles.error, { color: C.textMuted }]}>{error ?? "Failed to load stats"}</Text>
             ) : (
-                <View style={styles.body}>
+                <ScrollView
+                    contentContainerStyle={styles.body}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.textSecondary} />
+                    }
+                >
                     {flyerCard ? <Image source={{ uri: flyerCard }} style={styles.flyer} /> : null}
                     <Text style={[styles.title, { color: C.text }]}>{stats.title}</Text>
 
@@ -49,7 +83,7 @@ export default function EventInfoScreen({ route }: any) {
                         <StatCard C={C} icon="cube" label="Tickets Minted" value={`${stats.minted} / ${stats.ticketSupply}`} />
                         <StatCard C={C} icon="cash" label="Revenue" value={stats.revenue} />
                     </View>
-                </View>
+                </ScrollView>
             )}
         </View>
     );

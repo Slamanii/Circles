@@ -1,6 +1,16 @@
 import { useEffect, useState } from "react";
 import { fetchEvents } from "../services/eventService";
 
+export type TicketTier = {
+    id: string;
+    name: string;
+    price: number;
+    supply: number;
+    info: string | null;
+    sort_order: number;
+    remaining: number;
+};
+
 export type Event = {
     id: string;
     title: string;
@@ -12,6 +22,7 @@ export type Event = {
     creator_id: string;
     flyer_card: string | null;
     status: "active" | "expired" | "cancelled";
+    ticket_tiers: TicketTier[];
 };
 
 export function useEvents() {

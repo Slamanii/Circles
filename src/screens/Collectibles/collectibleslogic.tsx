@@ -2,6 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Collectible, fetchCollectibles } from "../../services/collectiblesService";
+import { AppNotification } from "../../services/notifications";
+import { getSocket } from "../../services/socket";
 
 export default function useCollectiblesLogic() {
     const navigation = useNavigation<any>();
@@ -28,6 +30,17 @@ export default function useCollectiblesLogic() {
     useEffect(() => { load(); }, []);
 
     const reload = async () => { await load(); };
+
+    // A ticket transfer or purchase claim can land while this screen is open
+    // (or backgrounded) — refresh instead of requiring a manual pull-to-refresh.
+    useEffect(() => {
+        const s = getSocket();
+        const handler = (n: AppNotification) => {
+            if (n.type === "collectible_received" || n.type === "collectible_purchase_confirmed") load();
+        };
+        s?.on("notification", handler);
+        return () => { s?.off("notification", handler); };
+    }, []);
 
     useEffect(() => {
         AsyncStorage.setItem("pinnedTickets", JSON.stringify(Array.from(pinnedIds)));

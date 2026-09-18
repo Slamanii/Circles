@@ -20,6 +20,7 @@ import { useStepUp } from "../../../hooks/useStepUp";
 import { CUSTODIAL } from "../../../hooks/useWalletConnection";
 import { makeCustodialSigner } from "../../../services/wallet/custodialSign";
 import { buildSwapTx, getSwapQuote } from "../../../services/wallet/swap/swapService";
+import { emitBalanceChanged } from "../../../services/wallet/walletEvents";
 import { Token } from "../../../../shared/Types";
 
 export default function SwapScreen({ route }: any) {
@@ -92,6 +93,7 @@ export default function SwapScreen({ route }: any) {
             const tx = VersionedTransaction.deserialize(txBytes);
             const signer = isCustodial ? makeCustodialSigner(requestStepUp) : signAndSendTransaction;
             await signer(tx);
+            emitBalanceChanged();
             Alert.alert("Swap submitted", "Transaction sent successfully.");
             navigation.goBack();
         } catch (err) {

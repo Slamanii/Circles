@@ -1,4 +1,5 @@
 import { supabase } from "../services/supabase";
+import { notifyUser } from "../services/realtime";
 
 export async function createStory({
     userId,
@@ -80,6 +81,22 @@ export async function likeStory({
 
     if (error && error.code !== "23505") {
         throw error;
+    }
+
+    const { data: item } = await supabase
+        .from("story_items")
+        .select("id, stories!inner(id, user_id)")
+        .eq("id", storyItemId)
+        .single();
+    const parentStory = item?.stories?.[0];
+    if (parentStory && parentStory.user_id !== userId) {
+        await notifyUser(parentStory.user_id, {
+            type: "story_liked",
+            body: "Someone liked your story",
+            reference_id: storyItemId,
+            reference_type: "story_item",
+            metadata: { storyId: parentStory.id, subId: storyItemId },
+        });
     }
 
     return true;

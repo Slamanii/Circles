@@ -2,16 +2,19 @@ import cors from "cors"
 import "dotenv/config"
 import express from "express"
 import rateLimit from "express-rate-limit"
+import http from "http"
+import { initRealtime } from "./src/services/realtime"
 import { requireUser, requireCronSecret, requireStepUp } from "./src/mod/auth"
 import { loginOrSignupRouter, resetPasswordRouter, savePushTokenRouter, getNonceRouter, deleteAccountRouter, exportWalletSecretRouter, linkWalletRouter, listLinkedWalletsRouter, reauthRouter } from "./src/routes/auth"
-import { deleteMessageRouter, pinMessageRouter, fetchUserGroupsRouter, createGroupChatRouter, deleteGroupRouter, fetchMessagesRouter, fetchUnreadNotificationsRouter, getGroupRouter, getUnreadCountRouter, leaveGroupRouter, makeAdminRouter, markAsReadRouter, markNotificationsReadRouter, removeMemberRouter, sendMessageRouter, starMessageRouter, unstarMessageRouter, fetchStarredIdsRouter, fetchNotificationsRouter } from "./src/routes/chat"
-import { fetchCollectiblesRouter, getTicketProofRouter, transferTicketRouter, initiatePaystackPayRouter, getPaymentOptionsRouter, confirmWalletPurchaseRouter, initiatepaystackWebhookRouter, paystackReturn } from "./src/routes/collectibles"
+import { deleteMessageRouter, pinMessageRouter, fetchUserGroupsRouter, createGroupChatRouter, deleteGroupRouter, fetchMessagesRouter, fetchUnreadNotificationsRouter, getGroupRouter, getUnreadCountRouter, leaveGroupRouter, makeAdminRouter, markAsReadRouter, markNotificationsReadRouter, removeMemberRouter, sendMessageRouter, starMessageRouter, unstarMessageRouter, fetchStarredIdsRouter, fetchNotificationsRouter, votePollRouter } from "./src/routes/chat"
+import { fetchCollectiblesRouter, getTicketProofRouter, getCollectibleByIdRouter, transferTicketRouter, initiatePaystackPayRouter, getPaymentOptionsRouter, confirmWalletPurchaseRouter, initiatepaystackWebhookRouter, paystackReturn } from "./src/routes/collectibles"
 import { createEventRouter, expireEventsRouter, burnExpiredTicketsRouter, fetchEventsRouter, likeEventRouter, mintTicketsRouter, resumeStuckMintsRouter, preSaveRouter, eventMetadataRouter, ticketMetadataRouter, uploadFlyerRouter, eventStatsRouter } from "./src/routes/events"
 import { resumeStuckMints } from "./src/mod/events"
 import { createStoryRouter, deleteStoryRouter, deleteSubStoryRouter, fetchDiscoverStoriesRouter, fetchStoriesPreviewRouter, fetchStoriesRouter, fetchStoryByIdRouter, fetchStoryByUserRouter, fetchStoryLikesRouter, fetchStoryViewsRouter, likeStoryRouter, unlikeStoryRouter, viewStoryRouter } from "./src/routes/stories"
 import { getUserRouter, getUserProfileRouter, searchUsersRouter, fetchEventLikesRouter, fetchFollowersRouter, fetchFollowingRouter, fetchHostedEventsRouter, fetchLikedEventsRouter, followUserRouter, unfollowUserRouter, updateProfileRouter } from "./src/routes/user"
-import { fetchTreasuryTxHistoryRouter, fetchTxHistoryOnchainRouter, signAndSendRouter } from "./src/routes/wallet"
+import { fetchTreasuryTxHistoryRouter, fetchTxHistoryOnchainRouter, fetchWalletTxHistoryOnchainRouter, signAndSendRouter } from "./src/routes/wallet"
 import { getUploadUrlRouter } from "./src/routes/upload"
+import { giphySearchRouter } from "./src/routes/giphy"
 
 
 const app = express();
@@ -85,6 +88,7 @@ router.post("/fetch-storylikes", requireUser, fetchStoryLikesRouter);
 router.get("/fetch-events", requireUser, fetchEventsRouter);
 router.post("/upload-flyer", requireUser, uploadFlyerRouter);
 router.post("/upload-url", requireUser, getUploadUrlRouter);
+router.get("/giphy-search", requireUser, giphySearchRouter);
 router.post("/create-event", requireUser, createEventRouter);
 router.post("/like-event", requireUser, likeEventRouter);
 router.get("/event-stats", requireUser, eventStatsRouter);
@@ -98,9 +102,11 @@ router.post("/payment-options", requireUser, getPaymentOptionsRouter);
 router.post("/confirm-wallet-purchase", requireUser, confirmWalletPurchaseRouter);
 router.get("/fetch-collectibles", requireUser, fetchCollectiblesRouter);
 router.get("/get-ticket-proof", requireUser, getTicketProofRouter);
+router.get("/get-collectible", requireUser, getCollectibleByIdRouter);
 router.post("/transfer-ticket", requireUser, transferTicketRouter);
 router.get("/fetch-treasury-tx", requireUser, fetchTreasuryTxHistoryRouter);
 router.get("/fetch-treasury-tx-onchain", requireUser, fetchTxHistoryOnchainRouter);
+router.get("/fetch-wallet-tx-onchain", requireUser, fetchWalletTxHistoryOnchainRouter);
 router.post("/initiate-paystack", requireUser, initiatePaystackPayRouter);
 router.post("/paystack-hook", initiatepaystackWebhookRouter);
 router.get("/paystack-return", paystackReturn);
@@ -123,6 +129,7 @@ router.post("/fetch-hosted-events", requireUser, fetchHostedEventsRouter);
 router.get("/fetch-user-groups", requireUser, fetchUserGroupsRouter);
 router.post("/delete-message", requireUser, deleteMessageRouter);
 router.post("/pin-message", requireUser, pinMessageRouter);
+router.post("/vote-poll", requireUser, votePollRouter);
 router.post("/star-message", requireUser, starMessageRouter);
 router.post("/unstar-message", requireUser, unstarMessageRouter);
 router.get("/starred-messages", requireUser, fetchStarredIdsRouter);
@@ -147,7 +154,10 @@ app.use("/api", router);
 
 app.get('/', (_req, res) => {res.send('Server is running on Port 4000')});
 
-app.listen(PORT, () => {
+const server = http.createServer(app);
+initRealtime(server);
+
+server.listen(PORT, () => {
     console.log(`server is running on port ${PORT}`);
     // Self-heal any mint jobs a previous crash/redeploy left stuck — no
     // external scheduler is confirmed for the cron route yet, so this is

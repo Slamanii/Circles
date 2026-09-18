@@ -1,20 +1,11 @@
 import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { supabase } from "./supabase";
 import { api } from "./apiClient";
+import { NotificationRow } from "../../shared/notificationTypes";
 
-export type AppNotification = {
-    id: string;
-    type: "chat" | "event" | "collectible" | "wallet" | "mention" | "like" | "follow";
-    title: string;
-    body?: string;
-    message?: string;
-    reference_id?: string;
-    reference_type?: string;
-    is_read: boolean;
-    created_at: string;
-    metadata?: Record<string, any>;
-};
+export type { NotificationType } from "../../shared/notificationTypes";
+export type AppNotification = NotificationRow & { message?: string };
 
 export async function fetchNotifications(limit = 30, offset = 0): Promise<AppNotification[]> {
     const json = await api.get<{ notifications: AppNotification[] }>(
@@ -28,39 +19,19 @@ export async function markAllNotificationsRead(): Promise<void> {
     await api.post("/api/mark-notification-read", undefined, "Failed to mark notifications read");
 }
 
-export function subscribeToNotifications(userId: string) {
-    const channel = supabase
-        .channel(`user-notifications-${userId}`)
-        .on(
-            "postgres_changes",
-            {
-                event: "INSERT",
-                schema: "public",
-                table: "notifications",
-                filter: `user_id=eq.${userId}`,
-            },
-            (payload) => {
-                const n = payload.new as AppNotification;
-                Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: n.title ?? "Fuego",
-                        body: n.body ?? "",
-                        data: { type: n.type, ...n.metadata },
-                    },
-                    trigger: null,
-                });
-            }
-        )
-        .subscribe();
-
-    return channel;
-}
-
 export async function registerForPushNotifications(): Promise<string | null> {
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== "granted") return null;
 
-    const tokenData = await Notifications.getExpoPushTokenAsync();
+    // Explicit projectId — auto-inference from app config isn't reliable in
+    // standalone/EAS builds, and a wrong/missing token here means push silently
+    // never arrives with no error surfaced anywhere.
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) {
+        console.error("registerForPushNotifications: missing EAS projectId in app config");
+        return null;
+    }
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
     const pushToken = tokenData.data;
 
     await AsyncStorage.setItem("push_token", pushToken);

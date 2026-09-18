@@ -1,4 +1,4 @@
-import { createGroupChat, getGroup, sendMessage, removeMember, fetchMessages, leaveGroup, deleteGroup, makeAdmin, fetchUnreadNotifications, markNotificationsRead, fetchUserGroups, deleteMessage, pinMessage, starMessage, unstarMessage, fetchStarredIds, fetchNotifications } from "../mod/chat";
+import { createGroupChat, getGroup, sendMessage, removeMember, fetchMessages, leaveGroup, deleteGroup, makeAdmin, fetchUnreadNotifications, markNotificationsRead, fetchUserGroups, deleteMessage, pinMessage, starMessage, unstarMessage, fetchStarredIds, fetchNotifications, votePoll } from "../mod/chat";
 import { markAsRead, getUnreadCount } from "../services/chat.service"
 import { AuthRequest } from "../mod/auth"
 import { Response } from "express" 
@@ -28,6 +28,20 @@ export async function deleteMessageRouter(req: AuthRequest, res: Response) {
         console.error(error);
         const message = error instanceof Error ? error.message : "Failed to delete message";
         res.status(message.includes("Only the sender") ? 403 : 500).json({ error: message });
+    }
+}
+
+export async function votePollRouter(req: AuthRequest, res: Response) {
+    try {
+        const userId = req.user!.id;
+        const { messageId, optionIds } = req.body;
+        if (!messageId || !Array.isArray(optionIds)) return res.status(400).json({ error: "Missing fields" });
+        const result = await votePoll({ messageId, userId, optionIds });
+        res.json(result);
+    } catch (error) {
+        console.error(error);
+        const message = error instanceof Error ? error.message : "Failed to vote";
+        res.status(message.includes("Not a group member") || message.includes("Not a poll") ? 403 : 500).json({ error: message });
     }
 }
 

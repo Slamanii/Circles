@@ -76,10 +76,14 @@ export async function deleteStory(deleteStoryData: string) {
     }
 }
 
+function isNormalizedStory(s: NormalizedStory | null | undefined): s is NormalizedStory {
+    return s != null;
+}
+
 export async function fetchStories() {
     try {
         const data = await api.get<RawStory[]>("/api/fetch-stories", "Failed to fetch stories");
-        return (data ?? []).map(normalizeStory);
+        return (data ?? []).map(normalizeStory).filter(isNormalizedStory);
     } catch (err) {
         console.error("fetchStories error:", err);
         throw err;
@@ -89,7 +93,7 @@ export async function fetchStories() {
 export async function fetchStoriesPreview() {
     try {
         const data = await api.get<RawStory[]>("/api/fetch-storiespreview", "Failed to fetch stories preview");
-        return (data ?? []).map(normalizeStory);
+        return (data ?? []).map(normalizeStory).filter(isNormalizedStory);
     } catch (err) {
         console.error("fetchStoriesPreview error:", err);
         throw err;
@@ -102,7 +106,7 @@ export async function fetchStoryByUser(userId?: string) {
             ? `/api/fetch-stories-by-user?userId=${userId}`
             : `/api/fetch-stories-by-user`;
         const data = await api.get<RawStory[]>(url, "Failed to fetch story by user");
-        return (data ?? []).map(normalizeStory);
+        return (data ?? []).map(normalizeStory).filter(isNormalizedStory);
     } catch (err) {
         console.error("fetchStoryByUser error:", err);
         throw err;
@@ -125,7 +129,7 @@ export async function fetchStoryById(storyId: string) {
 export async function fetchDiscoverStories() {
     try {
         const data = await api.get<RawStory[]>("/api/fetch-discover-stories", "Failed to fetch discover stories");
-        return (data ?? []).map(normalizeStory);
+        return (data ?? []).map(normalizeStory).filter(isNormalizedStory);
     } catch (err) {
         console.error("fetchDiscoverStories error:", err);
         throw err;

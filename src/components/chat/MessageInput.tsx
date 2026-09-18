@@ -14,17 +14,22 @@ type Props = {
     value: string;
     onChange: (text: string) => void;
     onSend: () => void;
-    onPickImage: () => void;
+    onCameraCapture: () => void;
     onRecordAudio: () => void;
     recording?: boolean;
     replyingTo?: Message | null;
     onCancelReply?: () => void;
     members?: Member[];
+    panelOpen: boolean;
+    onTogglePanel: () => void;
+    onOpenAttachPanel: () => void;
+    onInputFocus: () => void;
 };
 
 export function MessageInput({
-    value, onChange, onSend, onPickImage, onRecordAudio,
+    value, onChange, onSend, onCameraCapture, onRecordAudio,
     recording = false, replyingTo, onCancelReply, members = [],
+    panelOpen, onTogglePanel, onOpenAttachPanel, onInputFocus,
 }: Props) {
     const C = getColors(useAppTheme().theme);
     const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -46,6 +51,8 @@ export function MessageInput({
         onChange(updated);
         setMentionQuery(null);
     };
+
+    const hasText = !!value.trim();
 
     return (
         <View>
@@ -89,34 +96,46 @@ export function MessageInput({
 
             {/* Input row */}
             <View style={[styles.row, { borderTopColor: C.border, backgroundColor: C.card }]}>
-                <TouchableOpacity onPress={onPickImage} style={styles.iconBtn}>
-                    <Ionicons name="image-outline" size={22} color={C.textSecondary} />
+                <TouchableOpacity onPress={onOpenAttachPanel} style={styles.iconBtn}>
+                    <Ionicons name="add-circle-outline" size={26} color={C.textSecondary} />
                 </TouchableOpacity>
 
                 <TextInput
                     value={value}
                     onChangeText={onChange}
+                    onFocus={onInputFocus}
                     placeholder="Message..."
                     placeholderTextColor={C.textMuted}
                     style={[styles.input, { backgroundColor: C.surface, color: C.text }]}
                     multiline
                 />
 
-                <TouchableOpacity onPress={onRecordAudio} style={styles.iconBtn}>
+                <TouchableOpacity onPress={onTogglePanel} style={styles.iconBtn}>
                     <Ionicons
-                        name={recording ? "stop-circle" : "mic-outline"}
+                        name={panelOpen ? "keypad-outline" : "happy-outline"}
                         size={22}
-                        color={recording ? "#EF4444" : C.textSecondary}
+                        color={C.textSecondary}
                     />
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                    onPress={onSend}
-                    disabled={!value.trim()}
-                    style={[styles.sendBtn, { backgroundColor: value.trim() ? C.accent : C.surface }]}
-                >
-                    <Ionicons name="send" size={18} color={value.trim() ? "#fff" : C.textMuted} />
-                </TouchableOpacity>
+                {hasText ? (
+                    <TouchableOpacity onPress={onSend} style={[styles.sendBtn, { backgroundColor: C.accent }]}>
+                        <Ionicons name="send" size={18} color="#fff" />
+                    </TouchableOpacity>
+                ) : (
+                    <>
+                        <TouchableOpacity onPress={onCameraCapture} style={styles.iconBtn}>
+                            <Ionicons name="camera-outline" size={22} color={C.textSecondary} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={onRecordAudio} style={styles.iconBtn}>
+                            <Ionicons
+                                name={recording ? "stop-circle" : "mic-outline"}
+                                size={22}
+                                color={recording ? "#EF4444" : C.textSecondary}
+                            />
+                        </TouchableOpacity>
+                    </>
+                )}
             </View>
         </View>
     );

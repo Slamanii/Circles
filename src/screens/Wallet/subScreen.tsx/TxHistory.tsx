@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useMobileWallet } from "../../../hooks/useMobileWallet";
 import { fetchWalletTxHistory, ParsedTx } from "../../../services/wallet/history";
 
@@ -10,32 +10,40 @@ export default function TxHistoryScreen() {
     const { account } = useMobileWallet();
     const [txs, setTxs] = useState<ParsedTx[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        async function load() {
-            try {
-                // Prefer live MWA address, fall back to stored user address (email users)
-                let address = account?.address?.toBase58() ?? null;
-                if (!address) {
-                    const userRaw = await AsyncStorage.getItem("user");
-                    address = userRaw ? JSON.parse(userRaw)?.address ?? null : null;
-                }
-                if (!address) {
-                    setError("No wallet address found");
-                    return;
-                }
-                const data = await fetchWalletTxHistory(address);
-                setTxs(data);
-            } catch (err) {
-                console.error("TxHistory error:", err);
-                setError("Failed to load transactions");
-            } finally {
-                setLoading(false);
+    const load = useCallback(async () => {
+        try {
+            // Prefer live MWA address, fall back to stored user address (email users)
+            let address = account?.address?.toBase58() ?? null;
+            if (!address) {
+                const userRaw = await AsyncStorage.getItem("user");
+                address = userRaw ? JSON.parse(userRaw)?.address ?? null : null;
             }
+            if (!address) {
+                setError("No wallet address found");
+                return;
+            }
+            setError(null);
+            const data = await fetchWalletTxHistory(address);
+            setTxs(data);
+        } catch (err) {
+            console.error("TxHistory error:", err);
+            setError("Failed to load transactions");
         }
-        load();
     }, [account?.address]);
+
+    useEffect(() => {
+        setLoading(true);
+        load().finally(() => setLoading(false));
+    }, [load]);
+
+    const onRefresh = useCallback(async () => {
+        setRefreshing(true);
+        await load();
+        setRefreshing(false);
+    }, [load]);
 
     return (
         <View style={styles.container}>
@@ -53,6 +61,9 @@ export default function TxHistoryScreen() {
                     data={txs}
                     keyExtractor={(item) => item.signature}
                     contentContainerStyle={{ paddingBottom: 40 }}
+                    refreshControl={
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#60A5FA" />
+                    }
                     ListEmptyComponent={
                         <Text style={styles.empty}>No transactions found</Text>
                     }

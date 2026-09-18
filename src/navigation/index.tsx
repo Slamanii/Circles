@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import { BottomTabBarProps, createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { getFocusedRouteNameFromRoute } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { BlurView } from "expo-blur";
-import { StyleSheet } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { useAppTheme } from "../context/ThemeContext";
 
 import { ChatControlScreen } from "../screens/Chat/chatcontrolscreen";
@@ -31,7 +31,6 @@ import UserScreen from "../screens/User/userscreen";
 import BuyScreen from "../screens/Wallet/subScreen.tsx/Buy";
 import BuyFormScreen from "../screens/Wallet/subScreen.tsx/BuyFormScreen";
 import ChartScreen from "../screens/Wallet/subScreen.tsx/Chart";
-import ConfirmBuyScreen from "../screens/Wallet/subScreen.tsx/ConfirmBuyScreen";
 import ConfirmSendScreen from "../screens/Wallet/subScreen.tsx/ConfirmSendScreen";
 import ReceiveScreen from "../screens/Wallet/subScreen.tsx/Receive";
 import SendScreen from "../screens/Wallet/subScreen.tsx/Send";
@@ -46,7 +45,7 @@ const HIDE_TAB_ON: Record<string, string[]> = {
   Home:         ["EventDetails", "ChatListScreen", "ChatScreen", "ChatControl", "Notifications", "MediaViewer"],
   Search:       ["StoryDetail", "StoryUpload", "UserProfile", "FollowList", "EventInfo"],
   Collectibles: ["TicketInfo", "TicketQR", "SendTicket"],
-  Profile:      ["lists", "UserProfile", "FollowList", "EventInfo"],
+  Profile:      ["lists", "UserProfile", "FollowList", "EventInfo", "WalletStack"],
 };
 
 const Tab = createBottomTabNavigator();
@@ -88,7 +87,6 @@ function WalletStack() {
       <Stack.Screen name="ConfirmSend" component={ConfirmSendScreen} />
       <Stack.Screen name="Wallet-buy" component={BuyScreen} />
       <Stack.Screen name="BuyForm" component={BuyFormScreen} />
-      <Stack.Screen name="ConfirmBuy" component={ConfirmBuyScreen} />
       <Stack.Screen name="Wallet-swap" component={SwapScreen} />
       <Stack.Screen name="Wallet-history" component={TxHistoryScreen} />
       <Stack.Screen name="Wallet-settings" component={WalletSettingsScreen} />
@@ -118,6 +116,7 @@ function UserStack() {
       <Stack.Screen name="UserProfile" component={UserScreen} />
       <Stack.Screen name="FollowList" component={FollowListScreen} />
       <Stack.Screen name="EventInfo" component={EventInfoScreen} />
+      <Stack.Screen name="WalletStack" component={WalletStack} />
     </Stack.Navigator>
   )
 }
@@ -129,7 +128,6 @@ const TAB_ICONS: Record<string, { active: IconName; inactive: IconName }> = {
     Home:         { active: "home",   inactive: "home-outline" },
     Search:       { active: "search", inactive: "search-outline" },
     Collectibles: { active: "grid",   inactive: "grid-outline" },
-    Wallet:       { active: "card",   inactive: "card-outline" },
     Profile:      { active: "person", inactive: "person-outline" },
 };
 
@@ -155,64 +153,82 @@ const TAB_ICONS: Record<string, { active: IconName; inactive: IconName }> = {
  *      blur (native blur requires Android 12+ and RN New Architecture). The
  *      `androidSurface` background color below acts as the fallback tint.
  */
-export const TAB_BAR_HEIGHT = 80;
+export const TAB_BAR_HEIGHT = 96;
 
-function Tabs() {
+// Custom floating tab bar — rendered manually (instead of relying on
+// react-navigation's default BottomTabBar) so icon centering, bar width, and
+// the active pill are fully under our control instead of subject to the
+// default bar's label-space reservations and layout quirks.
+function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const { theme } = useAppTheme();
   const isDark = theme === "dark";
 
-  const visibleBar = [
-    tabStyles.bar,
-    isDark
-      ? { shadowColor: "#000", shadowOpacity: 0.5 }
-      : { shadowColor: "#000", shadowOpacity: 0.18 },
-  ] as const;
-
-  function barStyle(tabName: string, route: any) {
-    const focused = getFocusedRouteNameFromRoute(route);
-    if (focused && HIDE_TAB_ON[tabName]?.includes(focused)) {
-      return { display: "none" as const };
-    }
-    return visibleBar;
-  }
+  const activeRoute = state.routes[state.index];
+  const focusedNested = getFocusedRouteNameFromRoute(activeRoute);
+  const hidden = !!(focusedNested && HIDE_TAB_ON[activeRoute.name]?.includes(focusedNested));
+  if (hidden) return null;
 
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarActiveTintColor: "#E8622A",
-        tabBarInactiveTintColor: isDark ? "#F0EEE9" : "#0A0A0A",
-        tabBarShowLabel: true,
-        tabBarItemStyle: {
-          justifyContent: "center",
-          alignItems: "center",
-          paddingTop: 0,
-          paddingBottom: 0,
-        },
-        tabBarStyle: visibleBar,
-        tabBarBackground: () => (
-          <BlurView
-            tint={isDark ? "dark" : "light"}
-            intensity={80}
-            style={[StyleSheet.absoluteFill, tabStyles.blurInner]}
-          />
-        ),
-        tabBarIcon: ({ focused, color }) => {
-          const icons = TAB_ICONS[route.name];
-          const name = focused ? icons.active : icons.inactive;
-          return <Ionicons name={name} size={24} color={color} />;
-        },
-      })}
+    <View
+      style={[
+        tabStyles.bar,
+        isDark
+          ? { shadowColor: "#000", shadowOpacity: 0.5 }
+          : { shadowColor: "#000", shadowOpacity: 0.18 },
+      ]}
     >
-      <Tab.Screen name="Home"         component={HomeStack}
-        options={({ route }) => ({ tabBarStyle: barStyle("Home", route) })} />
-      <Tab.Screen name="Search"       component={SearchStack}
-        options={({ route }) => ({ tabBarStyle: barStyle("Search", route) })} />
-      <Tab.Screen name="Collectibles" component={CollectiblesStack}
-        options={({ route }) => ({ tabBarStyle: barStyle("Collectibles", route) })} />
-      <Tab.Screen name="Wallet"       component={WalletStack} />
-      <Tab.Screen name="Profile"      component={UserStack}
-        options={({ route }) => ({ tabBarStyle: barStyle("Profile", route) })} />
+      <BlurView
+        tint={isDark ? "dark" : "light"}
+        intensity={80}
+        style={[StyleSheet.absoluteFill, tabStyles.blurInner]}
+      />
+      {state.routes.map((route, index) => {
+        const isFocused = state.index === index;
+        const icons = TAB_ICONS[route.name];
+        const name = isFocused ? icons.active : icons.inactive;
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: "tabPress",
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={onPress}
+            style={tabStyles.item}
+            activeOpacity={0.8}
+          >
+            {isFocused ? (
+              <View style={tabStyles.activeIconWrap}>
+                <Ionicons name={name} size={18} color="#fff" />
+              </View>
+            ) : (
+              <Ionicons name={name} size={18} color={isDark ? "#F0EEE9" : "#0A0A0A"} />
+            )}
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+function Tabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <CustomTabBar {...props} />}
+    >
+      <Tab.Screen name="Home"         component={HomeStack} />
+      <Tab.Screen name="Search"       component={SearchStack} />
+      <Tab.Screen name="Collectibles" component={CollectiblesStack} />
+      <Tab.Screen name="Profile"      component={UserStack} />
     </Tab.Navigator>
   );
 }
@@ -229,23 +245,42 @@ export default function Navigation() {
   );
 }
 
+const BAR_HEIGHT = 60;
+const ACTIVE_ICON_HEIGHT = BAR_HEIGHT - 4;
+const ACTIVE_ICON_WIDTH = ACTIVE_ICON_HEIGHT;
+
 const tabStyles = StyleSheet.create({
   bar: {
     position: "absolute",
-    bottom: 20,
-    marginHorizontal: 50,
-    borderRadius: 28,
+    bottom: 32,
+    alignSelf: "center",
+    borderRadius: BAR_HEIGHT / 2,
     backgroundColor: "transparent",
-    borderTopWidth: 0,
-    elevation: 0,
-    height: 54,
-    paddingBottom: 0,
-    paddingTop: 0,
+    height: BAR_HEIGHT,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 20,
+    paddingHorizontal: 6,
     shadowOffset: { width: 0, height: 8 },
     shadowRadius: 20,
     overflow: "hidden",
   },
   blurInner: {
-    borderRadius: 28,
+    borderRadius: BAR_HEIGHT / 2,
+  },
+  item: {
+    width: ACTIVE_ICON_WIDTH,
+    height: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  activeIconWrap: {
+    backgroundColor: "#E8622A",
+    width: ACTIVE_ICON_WIDTH,
+    height: ACTIVE_ICON_HEIGHT,
+    borderRadius: ACTIVE_ICON_HEIGHT / 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

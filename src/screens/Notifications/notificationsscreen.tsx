@@ -16,20 +16,26 @@ import {
     fetchNotifications,
     markAllNotificationsRead,
 } from "../../services/notifications";
+import { getSocket } from "../../services/socket";
 import { Colors, getColors, Radius, TAB_PAD } from "../../shared/theme";
 
 type IconName = React.ComponentProps<typeof Ionicons>["name"];
 
 function typeIcon(type: AppNotification["type"]): IconName {
     switch (type) {
-        case "mention":     return "at-outline";
-        case "event":       return "calendar-outline";
-        case "collectible": return "ticket-outline";
-        case "wallet":      return "card-outline";
-        case "like":        return "heart-outline";
-        case "follow":      return "person-add-outline";
-        case "chat":
-        default:            return "chatbubble-outline";
+        case "chat_mention":                return "at-outline";
+        case "event_liked":
+        case "event_mint_complete":         return "calendar-outline";
+        case "collectible_received":
+        case "collectible_purchase_confirmed": return "ticket-outline";
+        case "wallet_reservation_refunded": return "card-outline";
+        case "story_liked":                 return "heart-outline";
+        case "follow_new":                  return "person-add-outline";
+        case "chat_message":
+        case "chat_removed_from_group":
+        case "chat_member_left":
+        case "chat_made_admin":
+        default:                            return "chatbubble-outline";
     }
 }
 
@@ -99,6 +105,20 @@ export default function NotificationsScreen() {
     useEffect(() => {
         load().finally(() => setLoading(false));
         markAllNotificationsRead().catch(() => {});
+    }, []);
+
+    // Prepend new notifications live instead of requiring a manual refresh.
+    // skipPanel notifications (e.g. chat fan-out) arrive as a synthetic,
+    // id-less payload since no row was ever written — skip those here, this
+    // is the in-app panel list, not a raw event feed.
+    useEffect(() => {
+        const s = getSocket();
+        const handler = (n: AppNotification) => {
+            if (!n.id) return;
+            setNotifications(prev => prev.some(x => x.id === n.id) ? prev : [n, ...prev]);
+        };
+        s?.on("notification", handler);
+        return () => { s?.off("notification", handler); };
     }, []);
 
     const onRefresh = async () => {

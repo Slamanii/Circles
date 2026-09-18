@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, AlertButton, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
@@ -8,6 +8,8 @@ import { LinkList, extractLinks } from "../../components/chat/LinkList";
 import { MediaGallery } from "../../components/chat/MediaGallery";
 import { MemberList } from "../../components/chat/MemberList";
 import { deleteGroup, getGroup, leaveGroup, makeAdmin, removeMember } from "../../services/chatService";
+import { AppNotification } from "../../services/notifications";
+import { getSocket } from "../../services/socket";
 import { RawGroup } from "../../../shared/Types";
 
 type Tab = "members" | "media" | "links";
@@ -20,24 +22,53 @@ export function ChatControlScreen({ route, navigation }: any) {
     const [activeTab, setActiveTab] = useState<Tab>("members");
     const currentUserIdRef = useRef<string | null>(null);
 
-    useEffect(() => {
-        async function load() {
-            try {
-                const token = await AsyncStorage.getItem("token");
-                if (token) {
-                    const payload = JSON.parse(atob(token.split(".")[1]));
-                    currentUserIdRef.current = payload.userId;
-                }
-                const data = await getGroup(groupId);
-                setGroup(data.group);
-            } catch (err) {
-                console.error("Failed to load group", err);
-            } finally {
-                setLoading(false);
+    const load = useCallback(async () => {
+        try {
+            const token = await AsyncStorage.getItem("token");
+            if (token) {
+                const payload = JSON.parse(atob(token.split(".")[1]));
+                currentUserIdRef.current = payload.userId;
             }
+            const data = await getGroup(groupId);
+            setGroup(data.group);
+        } catch (err) {
+            console.error("Failed to load group", err);
+        } finally {
+            setLoading(false);
         }
-        load();
     }, [groupId]);
+
+    useEffect(() => { load(); }, [load]);
+
+    // Live-refresh when another admin removes/promotes a member, someone
+    // leaves, or the group is deleted — this screen previously only ever
+    // reflected its own optimistic local patches, never anyone else's action.
+    useEffect(() => {
+        const s = getSocket();
+        const handler = (n: AppNotification) => {
+            if (n.metadata?.groupId !== groupId) return;
+            switch (n.type) {
+                case "chat_removed_from_group":
+                    if (!n.metadata?.removedUserId) {
+                        Alert.alert("Removed", "You were removed from this group.");
+                        navigation.navigate("ChatListScreen");
+                    } else {
+                        load();
+                    }
+                    break;
+                case "chat_group_deleted":
+                    Alert.alert("Group deleted", "This group was deleted.");
+                    navigation.navigate("ChatListScreen");
+                    break;
+                case "chat_made_admin":
+                case "chat_member_left":
+                    load();
+                    break;
+            }
+        };
+        s?.on("notification", handler);
+        return () => { s?.off("notification", handler); };
+    }, [groupId, load, navigation]);
 
     const handleRemove = async (userId: string) => {
         try {

@@ -3,6 +3,9 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-nat
 import PaymentTerminal from "../../components/EventPurchaseTerminal";
 import { TokenPicker } from "../../components/TokenPicker";
 import EventCard from "../../components/EventCard";
+import PasswordPromptModal from "../../components/PasswordPromptModal";
+import TierTabSwitcher from "../../components/TierTabSwitcher";
+import { TicketTier } from "../../hooks/useEvents";
 import EventHeader from "./eventheader";
 import { useEventLogic } from "./eventlogic";
 import { useAppTheme } from "../../context/ThemeContext";
@@ -51,6 +54,7 @@ function CountdownUnit({ value, label, C }: { value: number; label: string; C: a
 export default function EventPurchaseScreen({ route }: any) {
     const { eventId } = route.params;
     const C = getColors(useAppTheme().theme);
+    const [activeTierName, setActiveTierName] = useState("Base");
 
     const {
         events,
@@ -68,6 +72,7 @@ export default function EventPurchaseScreen({ route }: any) {
         tokenOptions,
         handleTokenSelect,
         closeTokenPicker,
+        promptProps,
     } = useEventLogic();
 
     if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
@@ -75,6 +80,9 @@ export default function EventPurchaseScreen({ route }: any) {
 
     const event = events.find(e => e.id === eventId);
     if (!event) return <Text style={{ margin: 20, color: C.text }}>Event not found</Text>;
+
+    const activeTier = (event.ticket_tiers ?? []).find(t => t.name === activeTierName);
+    const purchaseDisabled = !activeTier || activeTier.remaining <= 0;
 
     return (
         <>
@@ -90,13 +98,22 @@ export default function EventPurchaseScreen({ route }: any) {
                     onGetTicket={() => {}}
                 />
 
+                <TierTabSwitcher
+                    tiers={event.ticket_tiers ?? []}
+                    active={activeTierName}
+                    onChange={setActiveTierName}
+                />
+                <TierPanel tier={activeTier} tierName={activeTierName} C={C} />
+
                 <Countdown eventDate={event.event_date ?? null} />
 
                 <View style={styles.paymentSection}>
                     <Text style={[styles.paymentTitle, { color: C.text }]}>Choose Payment Method</Text>
                     <PaymentTerminal
-                        onPaystack={(qty: number) => handlePaystackPayment(event.id, qty)}
-                        onWallet={(qty: number) => handleWalletPayment(event.id, qty)}
+                        tierId={activeTier?.id ?? null}
+                        disabled={purchaseDisabled}
+                        onPaystack={(tierId: string, qty: number) => handlePaystackPayment(event.id, tierId, qty)}
+                        onWallet={(tierId: string, qty: number) => handleWalletPayment(event.id, tierId, qty)}
                     />
                 </View>
             </ScrollView>
@@ -108,7 +125,36 @@ export default function EventPurchaseScreen({ route }: any) {
                 onSelect={handleTokenSelect}
                 onClose={closeTokenPicker}
             />
+
+            <PasswordPromptModal {...promptProps} />
         </>
+    );
+}
+
+function TierPanel({ tier, tierName, C }: { tier: TicketTier | undefined; tierName: string; C: any }) {
+    if (!tier) {
+        return (
+            <View style={[styles.tierPanel, { backgroundColor: C.card }]}>
+                <Text style={[styles.tierPanelMsg, { color: C.textSecondary }]}>
+                    There are no {tierName} tickets for this event
+                </Text>
+            </View>
+        );
+    }
+
+    const soldOut = tier.remaining <= 0;
+
+    return (
+        <View style={[styles.tierPanel, { backgroundColor: C.card }]}>
+            <View style={styles.tierPanelHeader}>
+                <Text style={[styles.tierPanelName, { color: C.text }]}>{tier.name}</Text>
+                <Text style={[styles.tierPanelPrice, { color: C.text }]}>₦{tier.price.toLocaleString()}</Text>
+            </View>
+            {!!tier.info && (
+                <Text style={[styles.tierPanelInfo, { color: C.textSecondary }]}>{tier.info}</Text>
+            )}
+            {soldOut && <Text style={styles.tierPanelSoldOut}>Sold out</Text>}
+        </View>
     );
 }
 
@@ -196,5 +242,40 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: "700",
         marginBottom: 12,
+    },
+    tierPanel: {
+        marginHorizontal: 16,
+        marginTop: 10,
+        borderRadius: 16,
+        padding: 16,
+    },
+    tierPanelMsg: {
+        fontSize: 14,
+        fontWeight: "500",
+        textAlign: "center",
+    },
+    tierPanelHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+    },
+    tierPanelName: {
+        fontSize: 16,
+        fontWeight: "700",
+    },
+    tierPanelPrice: {
+        fontSize: 16,
+        fontWeight: "700",
+    },
+    tierPanelInfo: {
+        fontSize: 13,
+        marginTop: 6,
+        lineHeight: 18,
+    },
+    tierPanelSoldOut: {
+        marginTop: 8,
+        fontSize: 13,
+        fontWeight: "700",
+        color: "#EF4444",
     },
 });

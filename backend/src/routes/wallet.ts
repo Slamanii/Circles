@@ -1,7 +1,9 @@
 import {
     fetchTreasuryTxHistory,
     fetchTreasuryTxHistoryOnchain,
-    parseTreasuryTxLogs
+    fetchWalletTxHistoryOnchain,
+    parseTreasuryTxLogs,
+    parseWalletTxLogs
 } from "../services/treasuryWallet/fetchTxHistory"
 import { signAndSendTransaction } from "../mod/walletSign"
 import { AuthRequest } from "../mod/auth"
@@ -47,6 +49,31 @@ export async function fetchTxHistoryOnchainRouter(req: AuthRequest, res: Respons
     res.status(500).json({
       error: "Failed to fetch onchain treasury transactions"
     })
+  }
+}
+
+export async function fetchWalletTxHistoryOnchainRouter(req: AuthRequest, res: Response) {
+
+  try {
+
+    const address = req.query.address as string | undefined
+    if (!address) return res.status(400).json({ error: "address required" })
+
+    const limit = Number(req.query.limit) || 20
+
+    const txs = await fetchWalletTxHistoryOnchain(address, limit)
+
+    const txsComplete = parseWalletTxLogs(txs)
+
+    res.status(200).json(txsComplete)
+
+  } catch (error) {
+
+    console.error(error)
+
+    const message = error instanceof Error ? error.message : "Failed to fetch onchain wallet transactions"
+
+    res.status(400).json({ error: message })
   }
 }
 

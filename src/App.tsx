@@ -14,10 +14,13 @@ import CreateAccountScreen from "./screens/Auth/CreateAccountScreen";
 const WALLET_IDENTITY = { name: "Fuego", uri: "https://fuego.app", icon: "favicon.ico" };
 
 export type RootStackParamList = {
-    ChatListScreen: { chatId: string };
-    ChatRoom:       { chatId: string };
-    EventDetails:   { eventId: string };
-    TicketInfo:     { ticketId: string };
+    ChatListScreen:   { chatId: string };
+    ChatRoom:         { chatId: string };
+    EventDetails:     { eventId: string };
+    TicketInfo:       { ticketId?: string; ticket?: any };
+    UserProfile:      { followingId: string };
+    StoryDetail:      { storyId: string; subId?: string };
+    "Wallet-history": undefined;
 };
 
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();

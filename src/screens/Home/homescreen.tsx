@@ -114,9 +114,23 @@ export default function HomeScreen() {
     );
 
     if (error) return (
-        <View style={[styles.center, { backgroundColor: C.background }]}>
-            <Text style={[styles.errorText, { color: C.textSecondary }]}>{error}</Text>
-        </View>
+        <FlatList
+            data={[]}
+            keyExtractor={() => "error"}
+            renderItem={null}
+            contentContainerStyle={[styles.center, { flexGrow: 1, backgroundColor: C.background }]}
+            refreshControl={
+                <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={Colors.accent}
+                    colors={[Colors.accent]}
+                />
+            }
+            ListEmptyComponent={
+                <Text style={[styles.errorText, { color: C.textSecondary }]}>{error}</Text>
+            }
+        />
     );
 
     return (

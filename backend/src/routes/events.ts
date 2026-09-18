@@ -165,10 +165,21 @@ export async function eventMetadataRouter(req: Request, res: Response) {
 
 export async function ticketMetadataRouter(req: Request, res: Response) {
     try {
-        const event = await getEventById(req.params.id as string);
+        const eventId = req.params.id as string;
         const num = Number(req.params.num);
+        const event = await getEventById(eventId);
+
+        const { data: collectible } = await supabase
+            .from("collectibles")
+            .select("ticket_tiers(name, price, info)")
+            .eq("event_id", eventId)
+            .eq("serial_number", num)
+            .single();
+
+        const tier = collectible?.ticket_tiers as unknown as { name: string; price: number; info: string | null } | null;
+
         res.json({
-            name: `Ticket #${num}`,
+            name: tier ? `${tier.name} Ticket #${num}` : `Ticket #${num}`,
             symbol: "TKT",
             description: event.description ?? "",
             image: event.flyer_card ?? "",
@@ -176,6 +187,8 @@ export async function ticketMetadataRouter(req: Request, res: Response) {
                 { trait_type: "Serial", value: num },
                 { trait_type: "Venue", value: event.venue },
                 { trait_type: "Date", value: event.event_date },
+                ...(tier ? [{ trait_type: "Tier", value: tier.name }] : []),
+                ...(tier?.info ? [{ trait_type: "Tier Info", value: tier.info }] : []),
             ],
         });
     } catch {

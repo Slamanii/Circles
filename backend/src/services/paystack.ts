@@ -2,6 +2,7 @@ import axios from "axios";
 import crypto from "crypto";
 import { Request } from "express";
 import { supabase } from "./supabase";
+import { notifyUser } from "./realtime";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 const MAX_TICKETS_PER_USER = 5;
@@ -9,13 +10,15 @@ const MAX_TICKETS_PER_USER = 5;
 export async function initiatePaystackPay({
     userId,
     eventId,
+    tierId,
     quantity = 1,
 }: {
     userId: string;
     eventId: string;
+    tierId: string;
     quantity?: number;
 }) {
-    if (quantity < 1 || quantity > MAX_TICKETS_PER_USER) {
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > MAX_TICKETS_PER_USER) {
         throw new Error(`Quantity must be between 1 and ${MAX_TICKETS_PER_USER}`);
     }
 
@@ -30,13 +33,14 @@ export async function initiatePaystackPay({
         throw new Error(`Would exceed the ${MAX_TICKETS_PER_USER} ticket limit for this event`);
     }
 
-    const { data: event } = await supabase
-        .from("events")
-        .select("ticket_price")
-        .eq("id", eventId)
+    const { data: tier } = await supabase
+        .from("ticket_tiers")
+        .select("price")
+        .eq("id", tierId)
+        .eq("event_id", eventId)
         .single();
 
-    if (!event) throw new Error("Event not found");
+    if (!tier) throw new Error("Ticket tier not found");
 
     const { data: user } = await supabase
         .from("users")
@@ -48,7 +52,7 @@ export async function initiatePaystackPay({
 
     // Atomically reserve `quantity` tickets using FOR UPDATE SKIP LOCKED
     const { data: reserved, error: reserveError } = await supabase
-        .rpc("reserve_tickets", { p_event_id: eventId, p_quantity: quantity });
+        .rpc("reserve_tickets", { p_event_id: eventId, p_quantity: quantity, p_user_id: userId, p_tier_id: tierId });
 
     if (reserveError) throw reserveError;
     if (!reserved || reserved.length < quantity) {
@@ -63,7 +67,7 @@ export async function initiatePaystackPay({
             "https://api.paystack.co/transaction/initialize",
             {
                 email: user.email,
-                amount: event.ticket_price * quantity * 100,
+                amount: tier.price * quantity * 100,
                 reference,
                 metadata: {
                     mint_ids: mintIds,
@@ -89,7 +93,7 @@ export async function initiatePaystackPay({
         // Release all reservations if Paystack init fails
         await supabase
             .from("collectibles")
-            .update({ status: "pending" })
+            .update({ status: "pending", owner_id: null, reserved_at: null })
             .in("id", mintIds);
         throw err;
     }
@@ -141,4 +145,10 @@ export async function paystackWebhook(req: Request & { rawBody?: Buffer }) {
     }));
 
     await supabase.from("tx_history").insert(txRows);
+
+    await notifyUser(user_id, {
+        type: "collectible_purchase_confirmed",
+        body: `You claimed ${claimed.length} ticket(s)`,
+        reference_type: "event",
+    });
 }

@@ -1,12 +1,16 @@
-import { useState } from "react";
-import { Alert, Linking } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
-import { useMobileWallet } from "../../hooks/useMobileWallet";
-import { LikeEvent, PreSave } from "../../services/eventService";
-import { getPaymentOptions, confirmWalletPurchase, initiatePaystackPay } from "../../services/walletService";
-import { sendSol, sendSplToken } from "../../services/wallet/send";
+import { useEffect, useState } from "react";
+import { Alert, Linking } from "react-native";
 import { TOKENS } from "../../../shared/constants";
 import { useEvents } from "../../hooks/useEvents";
+import { useMobileWallet } from "../../hooks/useMobileWallet";
+import { useStepUp } from "../../hooks/useStepUp";
+import { ActiveWallet, CUSTODIAL, getActiveWallet } from "../../hooks/useWalletConnection";
+import { LikeEvent, PreSave } from "../../services/eventService";
+import { makeCustodialSigner } from "../../services/wallet/custodialSign";
+import { sendSol, sendSplToken } from "../../services/wallet/send";
+import { confirmWalletPurchase, getPaymentOptions, initiatePaystackPay } from "../../services/walletService";
 
 const TREASURY = process.env.EXPO_PUBLIC_TREASURY_ADDRESS!;
 
@@ -21,16 +25,33 @@ type TokenOption = {
 export function useEventLogic() {
     const navigation = useNavigation<any>();
     const wallet = useMobileWallet();
+    const { requestStepUp, promptProps } = useStepUp();
     const { events, loading, error, reload } = useEvents();
 
     const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
     const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
+    // Same source as walletscreen.tsx's gate — this hook has no route params,
+    // so it reads the user's active-wallet choice directly.
+    const [activeWallet, setActiveWalletState] = useState<ActiveWallet | null>(null);
+    const [storedAddress, setStoredAddress] = useState("");
+
+    useEffect(() => {
+        getActiveWallet().then(setActiveWalletState).catch(() => {});
+        AsyncStorage.getItem("user")
+            .then(raw => { if (raw) setStoredAddress(JSON.parse(raw).address ?? ""); })
+            .catch(() => {});
+    }, []);
+
+    const isCustodial = activeWallet === CUSTODIAL;
+    const canPay = isCustodial || !!wallet.account;
+    const effectiveAddress = isCustodial ? storedAddress : ((wallet.account as any)?.address?.toBase58?.() ?? "");
+
     // Token picker state
     const [pickerVisible, setPickerVisible] = useState(false);
     const [pickerLoading, setPickerLoading] = useState(false);
     const [tokenOptions, setTokenOptions] = useState<TokenOption[]>([]);
-    const [pendingPayment, setPendingPayment] = useState<{ eventId: string; quantity: number } | null>(null);
+    const [pendingPayment, setPendingPayment] = useState<{ eventId: string; tierId: string; quantity: number } | null>(null);
 
     const handleLike = async (eventId: string) => {
         setLikedIds(prev => new Set(prev).add(eventId));
@@ -54,9 +75,9 @@ export function useEventLogic() {
         navigation.navigate("checkout", { eventId });
     };
 
-    const handlePaystackPayment = async (eventId: string, quantity: number) => {
+    const handlePaystackPayment = async (eventId: string, tierId: string, quantity: number) => {
         try {
-            const result = await initiatePaystackPay(eventId, quantity);
+            const result = await initiatePaystackPay(eventId, tierId, quantity);
             if (result?.checkoutUrl) {
                 await Linking.openURL(result.checkoutUrl);
             }
@@ -65,17 +86,40 @@ export function useEventLogic() {
         }
     };
 
-    const handleWalletPayment = async (eventId: string, quantity: number) => {
-        if (!wallet.account) {
+    const handleWalletPayment = async (eventId: string, tierId: string, quantity: number) => {
+        if (!canPay) {
             Alert.alert("Connect your wallet first");
             return;
         }
-        setPendingPayment({ eventId, quantity });
+        setPendingPayment({ eventId, tierId, quantity });
         setPickerVisible(true);
         setPickerLoading(true);
         try {
-            const data = await getPaymentOptions(eventId, quantity);
-            setTokenOptions(data.options);
+            const data = await getPaymentOptions(eventId, tierId, quantity);
+            // Backend reserves tickets at quote time — if fewer were available than
+            // requested, it quotes for however many it could actually reserve.
+            // The adjusted quantity (not the original request) drives everything
+            // downstream: the payment amount and the confirm call both use it.
+            if (data.adjusted) {
+                setPickerVisible(false);
+                Alert.alert(
+                    "Fewer tickets available",
+                    `Only ${data.quantity} ticket${data.quantity > 1 ? "s" : ""} left. Continue with ${data.quantity}?`,
+                    [
+                        { text: "Cancel", style: "cancel", onPress: () => setPendingPayment(null) },
+                        {
+                            text: "Continue", onPress: () => {
+                                setPendingPayment({ eventId, tierId, quantity: data.quantity });
+                                setTokenOptions(data.options);
+                                setPickerVisible(true);
+                            },
+                        },
+                    ],
+                );
+            } else {
+                setPendingPayment({ eventId, tierId, quantity: data.quantity });
+                setTokenOptions(data.options);
+            }
         } catch (err) {
             setPickerVisible(false);
             Alert.alert("Failed to fetch prices", err instanceof Error ? err.message : "Please try again");
@@ -88,12 +132,14 @@ export function useEventLogic() {
         if (!pendingPayment) return;
         setPickerVisible(false);
 
-        const { eventId, quantity } = pendingPayment;
+        const { eventId, tierId } = pendingPayment;
         const isNativeSol = option.mint === TOKENS.solana.mint;
 
         try {
-            const signAndSend = (tx: any) => (wallet as any).signAndSendTransaction(tx);
-            const fromAddress = (wallet.account as any)?.address?.toBase58?.() ?? "";
+            const signAndSend = isCustodial
+                ? makeCustodialSigner(requestStepUp)
+                : (tx: any) => (wallet as any).signAndSendTransaction(tx);
+            const fromAddress = effectiveAddress;
             const tokenEntry = Object.values(TOKENS).find(t => t.mint === option.mint);
             const decimals = tokenEntry?.decimals ?? 9;
 
@@ -113,10 +159,13 @@ export function useEventLogic() {
                     decimals,
                 });
 
-            await confirmWalletPurchase(eventId, txSig, option.mint, quantity);
-            Alert.alert("Success", `${quantity} ticket${quantity > 1 ? "s" : ""} purchased!`);
+            const result = await confirmWalletPurchase(eventId, tierId, txSig, option.mint);
+            const claimed = result.ticketsClaimed;
+            Alert.alert("Success", `${claimed} ticket${claimed > 1 ? "s" : ""} purchased!`);
         } catch (err) {
             Alert.alert("Payment failed", err instanceof Error ? err.message : "Please try again");
+        } finally {
+            setPendingPayment(null);
         }
     };
 
@@ -132,11 +181,13 @@ export function useEventLogic() {
         handleGetTicket,
         handlePaystackPayment,
         handleWalletPayment,
+        canPayWithWallet: canPay,
         // Token picker
         pickerVisible,
         pickerLoading,
         tokenOptions,
         handleTokenSelect,
         closeTokenPicker: () => setPickerVisible(false),
+        promptProps,
     };
 }

@@ -2,6 +2,7 @@ import { Connection, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { decryptPrivateKey } from "./auth";
 import { keypairFromSecret } from "../services/solana";
 import { supabase } from "../services/supabase";
+import { emitToUser } from "../services/realtime";
 
 const CONNECTION = new Connection(process.env.SOLANA_RPC_URL!, "confirmed");
 
@@ -43,5 +44,13 @@ export async function signAndSendTransaction(userId: string, serializedTx: strin
     }
 
     await CONNECTION.confirmTransaction(signature, "confirmed");
+
+    // Live signal only — not routed through notifyUser/the notifications table,
+    // since the caller already sees the result synchronously and a push/panel
+    // entry would just be noise. Lets any other connected device (or the wallet
+    // screen sitting underneath, blurred, in the current stack) refresh balance
+    // without depending on a navigation focus transition ever firing.
+    emitToUser(userId, "wallet:balance_changed", { signature });
+
     return { signature };
 }

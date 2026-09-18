@@ -14,8 +14,9 @@ import { TicketProgram } from "../../../target/types/ticket_program";
 import bs58 from "bs58";
 import { supabase } from "../services/supabase";
 import { createGroupChat } from "./chat";
+import { notifyUser } from "../services/realtime";
 
-const CONNECTION = new Connection(process.env.SOLANA_RPC_URL!, "confirmed");
+export const CONNECTION = new Connection(process.env.SOLANA_RPC_URL!, "confirmed");
 const PROGRAM_ID = new PublicKey(process.env.PROGRAM_ID!); 
 
 
@@ -78,20 +79,36 @@ export async function initializeEventOnchain({
     return tx;
 }
 
+ type TierInput = { name: string; price: number; supply: number; info?: string };
+
  export async function createEvent(userId: string, data: any) {
 
     const {
         title,
         description,
-        ticketSupply,
-        ticketPrice,
+        tiers,
         eventDate,
         venue,
         flyerCard,
         creatorName,
-    } = data;
+    } = data as { tiers: TierInput[] } & Record<string, any>;
 
-    // 1. Insert event without group_id (group doesn't exist yet)
+    if (!Array.isArray(tiers) || tiers.length === 0) {
+        throw new Error("At least one ticket tier is required");
+    }
+    for (const tier of tiers) {
+        if (!tier.name || typeof tier.name !== "string") {
+            throw new Error("Every tier requires a name");
+        }
+        if (!(tier.price > 0)) throw new Error(`Tier "${tier.name}" needs a price greater than 0`);
+        if (!(tier.supply > 0)) throw new Error(`Tier "${tier.name}" needs a supply greater than 0`);
+    }
+
+    const ticketSupply = tiers.reduce((sum, t) => sum + t.supply, 0);
+    const ticketPrice = Math.min(...tiers.map(t => t.price));
+
+    // 1. Insert event without group_id (group doesn't exist yet). ticket_supply/
+    // ticket_price are now the aggregate total capacity / starting price.
     const { data: event, error } = await supabase
         .from("events")
         .insert({
@@ -109,36 +126,68 @@ export async function initializeEventOnchain({
 
     if (error) throw error;
 
-    // 2. Create group chat for the event
+    // 2. Insert the tiers — creator's submitted order becomes sort_order. If
+    // this fails, compensate by deleting the just-inserted event rather than
+    // wrapping in a DB transaction (createEvent is already a sequential,
+    // non-transactional series of steps); an event with zero tiers would
+    // otherwise be silently unsellable since reservation always needs a tier_id.
+    const { data: insertedTiers, error: tiersError } = await supabase
+        .from("ticket_tiers")
+        .insert(tiers.map((t, i) => ({
+            event_id: event.id,
+            name: t.name,
+            price: t.price,
+            supply: t.supply,
+            info: t.info ?? null,
+            sort_order: i,
+        })))
+        .select();
+
+    if (tiersError) {
+        await supabase.from("events").delete().eq("id", event.id);
+        throw tiersError;
+    }
+
+    // 3. Create group chat for the event
     const group = await createGroupChat(userId, creatorName ?? title, event.id);
 
-    // 3. Back-fill group_id on the event row
+    // 4. Back-fill group_id on the event row
     await supabase
         .from("events")
         .update({ group_id: group.id })
         .eq("id", event.id);
 
-    // 4. Initialize on-chain event with real metadata
+    // 5. Initialize on-chain event with real metadata
     const onChainTx = await initializeEventOnchain({
         eventId: event.id,
         title,
         maxSupply: ticketSupply,
     });
 
-    // 5. Kick off cNFT minting into treasury in the background — not awaited,
+    // 6. Kick off cNFT minting into treasury in the background — not awaited,
     // so this request doesn't block for the full mint duration. Resumable via
     // runMintJob's atomic claim if the process crashes mid-run.
     runMintJob(event.id);
 
     return {
-        event: { ...event, group_id: group.id },
+        event: { ...event, group_id: group.id, tiers: insertedTiers },
         group,
         onChainTx,
         mint: { status: "queued" },
     };
  }
 
-async function mintOneCnft(eventId: string) {
+type TierBoundary = { id: string; name: string; upTo: number };
+
+// Cumulative supply boundaries in sort_order, e.g. tiers [VIP++:20, VIP:50,
+// Base:200] -> serials 1-20 = VIP++, 21-70 = VIP, 71-270 = Base.
+function resolveTierForSerial(boundaries: TierBoundary[], serialNumber: number): TierBoundary {
+    const tier = boundaries.find(b => serialNumber <= b.upTo);
+    if (!tier) throw new Error(`No tier covers serial number ${serialNumber}`);
+    return tier;
+}
+
+async function mintOneCnft(eventId: string, tierBoundaries: TierBoundary[]) {
     const program = getProgram();
 
     const [globalStatePda] = PublicKey.findProgramAddressSync(
@@ -163,9 +212,10 @@ async function mintOneCnft(eventId: string) {
 
     const serialNumber = eventAccount.minted.toNumber() + 1;
     const leafIndex = mintedInTree;
+    const tier = resolveTierForSerial(tierBoundaries, serialNumber);
 
     const metadata = {
-        name: `Ticket #${serialNumber}`,
+        name: `${tier.name} Ticket #${serialNumber}`,
         symbol: "TKT",
         uri: `${process.env.API_BASE_URL}/api/events/${eventId}/tickets/${serialNumber}`,
     };
@@ -199,6 +249,7 @@ async function mintOneCnft(eventId: string) {
         owner_address: treasuryWeb3Keypair.publicKey.toBase58(),
         tx_signature: tx,
         metadata_uri: metadata.uri,
+        tier_id: tier.id,
         status: "pending",
     });
 
@@ -208,9 +259,24 @@ async function mintOneCnft(eventId: string) {
 export async function mintTickets({ eventId }: { eventId: string }) {
     const results = [];
 
+    const { data: tiers, error: tiersError } = await supabase
+        .from("ticket_tiers")
+        .select("id, name, supply")
+        .eq("event_id", eventId)
+        .order("sort_order", { ascending: true });
+
+    if (tiersError) throw tiersError;
+    if (!tiers || tiers.length === 0) throw new Error(`No ticket tiers found for event ${eventId}`);
+
+    let cumulative = 0;
+    const tierBoundaries: TierBoundary[] = tiers.map(t => {
+        cumulative += t.supply;
+        return { id: t.id, name: t.name, upTo: cumulative };
+    });
+
     while (true) {
         try {
-            results.push(await mintOneCnft(eventId));
+            results.push(await mintOneCnft(eventId, tierBoundaries));
         } catch (err) {
             const e = err as { message?: string; logs?: string[] };
             if (e.message?.includes("Event sold out")) {
@@ -260,6 +326,21 @@ export function runMintJob(eventId: string): void {
                     mint_lock_acquired_at: null,
                 })
                 .eq("id", eventId);
+
+            const { data: ev } = await supabase
+                .from("events")
+                .select("creator_id, title")
+                .eq("id", eventId)
+                .single();
+            if (ev) {
+                await notifyUser(ev.creator_id, {
+                    type: "event_mint_complete",
+                    body: `Tickets for "${ev.title}" have finished minting`,
+                    reference_id: eventId,
+                    reference_type: "event",
+                    metadata: { eventId },
+                });
+            }
         } catch (err) {
             await supabase
                 .from("events")
@@ -270,6 +351,21 @@ export function runMintJob(eventId: string): void {
                     mint_lock_acquired_at: null,
                 })
                 .eq("id", eventId);
+
+            const { data: failedEv } = await supabase
+                .from("events")
+                .select("creator_id, title")
+                .eq("id", eventId)
+                .single();
+            if (failedEv) {
+                await notifyUser(failedEv.creator_id, {
+                    type: "event_mint_failed",
+                    body: `Minting tickets for "${failedEv.title}" failed`,
+                    reference_id: eventId,
+                    reference_type: "event",
+                    metadata: { eventId },
+                }).catch(console.error);
+            }
         }
     })().catch((err) => {
         console.error(`Unhandled error in mint job for event ${eventId}:`, err);
@@ -473,13 +569,18 @@ export async function getEventStats(eventId: string, userId: string) {
   if (eventError || !event) throw new Error("Event not found");
   if (event.creator_id !== userId) throw new Error("Unauthorized");
 
-  const [likesResult, mintedResult, soldResult] = await Promise.all([
+  const [likesResult, mintedResult, soldRowsResult, tiersResult] = await Promise.all([
     supabase.from("event_likes").select("id", { count: "exact", head: true }).eq("event_id", eventId),
     supabase.from("collectibles").select("id", { count: "exact", head: true }).eq("event_id", eventId),
-    supabase.from("collectibles").select("id", { count: "exact", head: true }).eq("event_id", eventId).neq("custodian", "treasury"),
+    supabase.from("collectibles").select("tier_id").eq("event_id", eventId).neq("custodian", "treasury"),
+    supabase.from("ticket_tiers").select("id, price").eq("event_id", eventId),
   ]);
 
-  const sold = soldResult.count ?? 0;
+  const soldRows = soldRowsResult.data ?? [];
+  const sold = soldRows.length;
+
+  const priceByTier = new Map((tiersResult.data ?? []).map(t => [t.id, t.price]));
+  const revenue = soldRows.reduce((sum, row) => sum + (priceByTier.get(row.tier_id) ?? 0), 0);
 
   return {
     title: event.title,
@@ -488,20 +589,44 @@ export async function getEventStats(eventId: string, userId: string) {
     totalLikes: likesResult.count ?? 0,
     minted: mintedResult.count ?? 0,
     sold,
-    revenue: sold * (event.ticket_price ?? 0),
+    revenue,
   };
 }
 
 export async function fetchEvents(limit: number = 50, offset: number = 0) {
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, description, ticket_price, ticket_supply, event_date, venue, creator_id, flyer_card, status")
+    .select("id, title, description, ticket_price, ticket_supply, event_date, venue, creator_id, flyer_card, status, ticket_tiers(id, name, price, supply, info, sort_order)")
     .eq("status", "active")
     .order("event_date", { ascending: true })
     .range(offset, offset + limit - 1)
 
   if (error) throw error
-  return data
+  if (!data?.length) return data
+
+  const tierIds = data.flatMap((e) => (e.ticket_tiers ?? []).map((t: any) => t.id));
+  const remainingByTier = new Map<string, number>();
+
+  if (tierIds.length) {
+    const { data: pendingRows } = await supabase
+      .from("collectibles")
+      .select("tier_id")
+      .eq("status", "pending")
+      .eq("custodian", "treasury")
+      .in("tier_id", tierIds);
+
+    for (const row of pendingRows ?? []) {
+      remainingByTier.set(row.tier_id, (remainingByTier.get(row.tier_id) ?? 0) + 1);
+    }
+  }
+
+  return data.map((e) => ({
+    ...e,
+    ticket_tiers: (e.ticket_tiers ?? []).map((t: any) => ({
+      ...t,
+      remaining: remainingByTier.get(t.id) ?? 0,
+    })),
+  }));
 }
 
 export async function likeEvent({
@@ -532,6 +657,22 @@ export async function likeEvent({
     event_id: eventId,
     user_id: userId,
   });
+
+  const { data: event } = await supabase
+    .from("events")
+    .select("creator_id, title")
+    .eq("id", eventId)
+    .single();
+
+  if (event && event.creator_id !== userId) {
+    await notifyUser(event.creator_id, {
+      type: "event_liked",
+      body: `Someone liked your event "${event.title}"`,
+      reference_id: eventId,
+      reference_type: "event",
+      metadata: { eventId },
+    });
+  }
 
   return { liked: true };
 }

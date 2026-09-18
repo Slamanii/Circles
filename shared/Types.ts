@@ -174,15 +174,22 @@ export type RawGroupMember = {
   users?: RawUser;
 };
 
+export type PollOption = { id: string; text: string };
+export type PollVote = { user_id: string; option_id: string };
+
 export type RawMessage = {
   id: string;
   group_id?: string;
   content: string;
-  type: "text" | "image" | "video" | "audio";
+  type: "text" | "image" | "video" | "audio" | "gif" | "file" | "poll";
   sender_id: string;
   senderName: string;
   created_at: string;
-  media?: { uri: string; thumbnail?: string; duration?: number } | null;
+  media?: {
+    uri?: string; thumbnail?: string; duration?: number; filename?: string; size?: number; mimeType?: string;
+    options?: PollOption[]; multiSelect?: boolean;
+  } | null;
+  poll_votes?: PollVote[];
   reply_to?: string | null;
   reply_to_message?: { id: string; senderName: string; content: string } | null;
   is_pinned?: boolean;
@@ -210,7 +217,7 @@ export type Message = {
   senderId: string;
   senderName: string;
   content: string;
-  type: "text" | "image" | "video" | "audio" | "system";
+  type: "text" | "image" | "video" | "audio" | "gif" | "file" | "poll" | "system";
   time: string;
   date: string;
   isPinned?: boolean;
@@ -219,7 +226,11 @@ export type Message = {
   isMine: boolean;
   starred?: boolean;
   status?: "sending" | "sent" | "delivered" | "read";
-  media?: { uri: string; thumbnail?: string; duration?: number };
+  media?: {
+    uri?: string; thumbnail?: string; duration?: number; filename?: string; size?: number; mimeType?: string;
+    options?: PollOption[]; multiSelect?: boolean;
+  };
+  pollVotes?: PollVote[];
   replyTo?: { id: string; senderName: string; content: string };
 };
 
@@ -311,7 +322,6 @@ export type WalletControlPanelType = {
     onReceive: () => void;
     onSend: () => void;
     onSwap: () => void;
-    onBuy: () => void;
 };
 
 export type TokenDetailsType = {

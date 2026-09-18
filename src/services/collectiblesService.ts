@@ -15,12 +15,24 @@ export type Collectible = {
         title: string;
         event_date: string;
         venue: string;
+        flyer_card: string | null;
+    } | null;
+    tier: {
+        name: string;
+        price: number;
+        info: string | null;
+        sort_order: number;
     } | null;
 };
 
 export async function fetchCollectibles(): Promise<Collectible[]> {
     const data = await api.get<{ collectibles: Collectible[] }>("/api/fetch-collectibles", "Failed to fetch collectibles");
     return data.collectibles;
+}
+
+export async function fetchCollectibleById(id: string): Promise<Collectible> {
+    const data = await api.get<{ collectible: Collectible }>(`/api/get-collectible?id=${id}`, "Failed to fetch ticket");
+    return data.collectible;
 }
 
 /**

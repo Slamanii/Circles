@@ -1,5 +1,5 @@
 import { supabase } from "../services/supabase";
-import { sendPushNotification } from "../services/notifications"
+import { notifyUser, emitToUser, emitToGroup } from "../services/realtime";
 
 export async function createGroupChat(
     creatorId: string, groupName: string, eventId: string
@@ -85,8 +85,11 @@ export async function sendMessage({
     groupId: string;
     userId: string;
     content: string;
-    type?: "text" | "image" | "video" | "audio";
-    media?: { uri: string; thumbnail?: string; duration?: number };
+    type?: "text" | "image" | "video" | "audio" | "gif" | "file" | "poll";
+    media?: {
+        uri?: string; thumbnail?: string; duration?: number; filename?: string; size?: number; mimeType?: string;
+        options?: { id: string; text: string }[]; multiSelect?: boolean;
+    };
     replyTo?: string;
 }) {
     const { data: member } = await supabase
@@ -100,7 +103,7 @@ export async function sendMessage({
 
     const { data: user } = await supabase
         .from("users")
-        .select("username, display_name")
+        .select("username, display_name, avatar")
         .eq("id", userId)
         .single();
 
@@ -121,10 +124,22 @@ export async function sendMessage({
 
     if (error) throw error;
 
-    // Device push for all group members is handled client-side — each member's
-    // NotificationProvider subscribes to the messages table and fires a local
-    // push notification showing sender name + content preview.
-    // The notifications table is only used for in-app panel entries (mentions, events, etc).
+    // Fan out a live socket event plus a skip-panel notify (for push, when the
+    // recipient isn't connected) to every other member of the group.
+    const { data: members } = await supabase
+        .from("group_members").select("user_id").eq("group_id", groupId).neq("user_id", userId);
+    for (const m of members ?? []) {
+        notifyUser(m.user_id, {
+            type: "chat_message",
+            title: user?.display_name ?? user?.username ?? "Unknown",
+            body: content,
+            reference_id: groupId,
+            reference_type: "group",
+            metadata: { groupId },
+            imageUrl: user?.avatar ?? undefined,
+        }, { skipPanel: true }).catch(console.error);
+        emitToUser(m.user_id, "chat:message", message);
+    }
 
     // @mentioned users get an in-app panel notification as well as the device push
     const mentionMatches = content.match(/@(\w+)/g) ?? [];
@@ -136,13 +151,13 @@ export async function sendMessage({
             .eq("username", username)
             .single();
         if (mentioned && mentioned.id !== userId) {
-            await supabase.from("notifications").insert({
-                user_id: mentioned.id,
-                type: "mention",
-                title: `${user?.username ?? "Someone"} mentioned you`,
+            await notifyUser(mentioned.id, {
+                type: "chat_mention",
                 body: content,
                 reference_id: groupId,
                 reference_type: "group",
+                metadata: { groupId },
+                imageUrl: user?.avatar ?? undefined,
             });
         }
     }
@@ -206,6 +221,12 @@ export async function removeMember({
         throw new Error("Admin cannot be removed");
     }
 
+    const { data: targetUser } = await supabase
+        .from("users")
+        .select("username, display_name")
+        .eq("id", targetUserId)
+        .single();
+
     const { error: removeError } = await supabase
         .from("group_members")
         .delete()
@@ -215,14 +236,27 @@ export async function removeMember({
 
         if (removeError) throw removeError;
 
-        await supabase.from("notifications").insert({
-            user_id: targetUserId,
-            type: "chat",
-            title: "New Message",
+        await notifyUser(targetUserId, {
+            type: "chat_removed_from_group",
             body: "You were removed from the group",
             reference_id: groupId,
-            reference_type: "group"
-            });
+            reference_type: "group",
+            metadata: { groupId },
+        });
+
+        // Remaining members' member list needs to reflect the removal live too —
+        // skip their panel since this isn't "their" notification, just a live sync.
+        const { data: remainingMembers } = await supabase
+            .from("group_members").select("user_id").eq("group_id", groupId);
+        for (const m of remainingMembers ?? []) {
+            notifyUser(m.user_id, {
+                type: "chat_removed_from_group",
+                body: `${targetUser?.display_name ?? targetUser?.username ?? "A member"} was removed from the group`,
+                reference_id: groupId,
+                reference_type: "group",
+                metadata: { groupId, removedUserId: targetUserId },
+            }, { skipPanel: true }).catch(console.error);
+        }
 
         return {
             success: true
@@ -262,7 +296,8 @@ export async function fetchMessages({
       senderName,
       type,
       media,
-      reply_to
+      reply_to,
+      poll_votes ( user_id, option_id )
     `)
     .eq("group_id", groupId)
     .order("created_at", { ascending: false })
@@ -273,6 +308,61 @@ export async function fetchMessages({
   return { messages };
 }
 
+export async function votePoll({
+    messageId,
+    userId,
+    optionIds,
+}: {
+    messageId: string;
+    userId: string;
+    optionIds: string[];
+}) {
+    const { data: message, error: fetchError } = await supabase
+        .from("messages")
+        .select("group_id, type, media")
+        .eq("id", messageId)
+        .single();
+
+    if (fetchError || !message) throw new Error("Message not found");
+    if (message.type !== "poll") throw new Error("Not a poll message");
+
+    const { data: member } = await supabase
+        .from("group_members")
+        .select("id")
+        .eq("group_id", message.group_id)
+        .eq("user_id", userId)
+        .single();
+
+    if (!member) throw new Error("Not a group member");
+
+    const validOptionIds = new Set((message.media?.options ?? []).map((o: { id: string }) => o.id));
+    const chosen = optionIds.filter(id => validOptionIds.has(id));
+
+    const { error: deleteError } = await supabase
+        .from("poll_votes")
+        .delete()
+        .eq("message_id", messageId)
+        .eq("user_id", userId);
+    if (deleteError) throw deleteError;
+
+    if (chosen.length > 0) {
+        const { error: insertError } = await supabase
+            .from("poll_votes")
+            .insert(chosen.map(optionId => ({ message_id: messageId, user_id: userId, option_id: optionId })));
+        if (insertError) throw insertError;
+    }
+
+    const { data: votes, error: votesError } = await supabase
+        .from("poll_votes")
+        .select("user_id, option_id")
+        .eq("message_id", messageId);
+    if (votesError) throw votesError;
+
+    emitToGroup(message.group_id, "poll:update", { messageId, votes }).catch(console.error);
+
+    return { votes };
+}
+
 export async function leaveGroup({
   groupId,
   userId,
@@ -280,6 +370,12 @@ export async function leaveGroup({
   groupId: string;
   userId: string;
 }) {
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("username, display_name")
+    .eq("id", userId)
+    .single();
 
   const { error } = await supabase
     .from("group_members")
@@ -289,14 +385,19 @@ export async function leaveGroup({
 
   if (error) throw error;
 
-  await supabase.from("notifications").insert({
-            user_id: userId,
-            type: "chat",
-            title: "New Message",
-            body: "You left the group.",
-            reference_id: groupId,
-            reference_type: "group"
-            });
+  // Notify the remaining members — the leaver has already navigated away
+  // client-side, so they're not the useful recipient here.
+  const { data: members } = await supabase
+    .from("group_members").select("user_id").eq("group_id", groupId);
+  for (const m of members ?? []) {
+    notifyUser(m.user_id, {
+      type: "chat_member_left",
+      body: `${user?.display_name ?? user?.username ?? "Someone"} left the group`,
+      reference_id: groupId,
+      reference_type: "group",
+      metadata: { groupId },
+    }).catch(console.error);
+  }
 
   return { success: true };
 }
@@ -322,9 +423,24 @@ export async function deleteGroup({
     throw new Error("Only admin can delete group");
   }
 
+  // Fetch remaining members before the group_members rows are gone —
+  // there'd be nobody left to look up otherwise.
+  const { data: members } = await supabase
+    .from("group_members").select("user_id").eq("group_id", groupId).neq("user_id", userId);
+
   await supabase.from("messages").delete().eq("group_id", groupId);
   await supabase.from("group_members").delete().eq("group_id", groupId);
   await supabase.from("groups").delete().eq("id", groupId);
+
+  for (const m of members ?? []) {
+    notifyUser(m.user_id, {
+      type: "chat_group_deleted",
+      body: "This group was deleted",
+      reference_id: groupId,
+      reference_type: "group",
+      metadata: { groupId },
+    }).catch(console.error);
+  }
 
   return { success: true };
 }
@@ -359,14 +475,32 @@ export async function makeAdmin({
 
   if (error) throw error;
 
-  await supabase.from("notifications").insert({
-            user_id: targetUserId,
-            type: "chat",
-            title: "New Message",
+  const { data: targetUser } = await supabase
+    .from("users")
+    .select("username, display_name")
+    .eq("id", targetUserId)
+    .single();
+
+  await notifyUser(targetUserId, {
+            type: "chat_made_admin",
             body: "You are now an admin",
             reference_id: groupId,
-            reference_type: "group"
+            reference_type: "group",
+            metadata: { groupId },
             });
+
+  // Other members' member list needs the new role live too.
+  const { data: otherMembers } = await supabase
+    .from("group_members").select("user_id").eq("group_id", groupId).neq("user_id", targetUserId);
+  for (const m of otherMembers ?? []) {
+    notifyUser(m.user_id, {
+      type: "chat_made_admin",
+      body: `${targetUser?.display_name ?? targetUser?.username ?? "A member"} is now an admin`,
+      reference_id: groupId,
+      reference_type: "group",
+      metadata: { groupId, promotedUserId: targetUserId },
+    }, { skipPanel: true }).catch(console.error);
+  }
 
   return { success: true };
 }
@@ -405,7 +539,10 @@ export async function pinMessage({
 
     if (error) throw error;
 
-    return { pinned: !message.is_pinned };
+    const pinned = !message.is_pinned;
+    emitToGroup(groupId, "chat:pin", { messageId, pinned }, userId).catch(console.error);
+
+    return { pinned };
 }
 
 export async function deleteMessage({
@@ -420,7 +557,7 @@ export async function deleteMessage({
     // fetch message to verify sender
     const { data: message, error: fetchError } = await supabase
         .from("messages")
-        .select("sender_id, deleted_for")
+        .select("sender_id, deleted_for, group_id")
         .eq("id", messageId)
         .single();
 
@@ -435,6 +572,7 @@ export async function deleteMessage({
             .update({ deleted: true, content: "This message was deleted" })
             .eq("id", messageId);
         if (error) throw error;
+        emitToGroup(message.group_id, "chat:delete", { messageId, deleteFor: "everyone" }, userId).catch(console.error);
         return { deleted: "everyone" };
     }
 
@@ -445,6 +583,8 @@ export async function deleteMessage({
         .update({ deleted_for: [...already, userId] })
         .eq("id", messageId);
     if (error) throw error;
+    // Only this user's own devices should hide it — other members must still see it.
+    emitToUser(userId, "chat:delete", { messageId, deleteFor: "me" });
     return { deleted: "me" };
 }
 

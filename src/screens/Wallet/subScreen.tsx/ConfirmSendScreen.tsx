@@ -14,6 +14,7 @@ import { useStepUp } from "../../../hooks/useStepUp";
 import { CUSTODIAL } from "../../../hooks/useWalletConnection";
 import { makeCustodialSigner } from "../../../services/wallet/custodialSign";
 import { sendSol, sendSplToken } from "../../../services/wallet/send";
+import { emitBalanceChanged } from "../../../services/wallet/walletEvents";
 import { Token } from "../../../../shared/Types";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
@@ -65,6 +66,7 @@ export default function ConfirmSendScreen({ navigation, route }: any) {
                     decimals: token.decimals,
                 });
 
+            emitBalanceChanged();
             Alert.alert("Sent!", `Transaction: ${sig.slice(0, 12)}...`, [
                 { text: "Done", onPress: () => navigation.popToTop() },
             ]);

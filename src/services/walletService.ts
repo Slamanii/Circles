@@ -1,31 +1,33 @@
 import { api } from "./apiClient";
 
-export async function getPaymentOptions(eventId: string, quantity: number) {
+export async function getPaymentOptions(eventId: string, tierId: string, quantity: number) {
     return api.post<{
         options: { key: string; symbol: string; mint: string; decimals: number; amount: number; rawAmount: number }[];
-        event: { ticket_price: number; title: string };
+        tier: { price: number; name: string };
         quantity: number;
-    }>("/api/payment-options", { eventId, quantity }, "Failed to fetch payment options");
+        requestedQuantity: number;
+        adjusted: boolean;
+    }>("/api/payment-options", { eventId, tierId, quantity }, "Failed to fetch payment options");
 }
 
 export async function confirmWalletPurchase(
     eventId: string,
+    tierId: string,
     txSignature: string,
     tokenMint: string,
-    quantity: number,
 ) {
     return api.post<{ success: boolean; ticketsClaimed: number }>(
         "/api/confirm-wallet-purchase",
-        { eventId, txSignature, tokenMint, quantity },
+        { eventId, tierId, txSignature, tokenMint },
         "Failed to confirm wallet purchase",
     );
 }
 
-export async function initiatePaystackPay(eventId: string, quantity: number) {
+export async function initiatePaystackPay(eventId: string, tierId: string, quantity: number) {
     try {
         return await api.post<{ checkoutUrl: string; reference: string; quantity: number }>(
             "/api/initiate-paystack",
-            { eventId, quantity },
+            { eventId, tierId, quantity },
             "Failed to initiate paystack transaction",
         );
     } catch (err) {

@@ -14,6 +14,8 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { deleteStory, deleteSubStory, fetchStoryById, fetchStoryLikes, fetchStoryViews, likeStory, unlikeStory } from "../../services/story";
 import { unfollowUser } from "../../services/user";
+import { AppNotification } from "../../services/notifications";
+import { getSocket } from "../../services/socket";
 import useStoryLogic, { muteStoryUser } from "./storieslogic";
 import { useNavigation } from "@react-navigation/native";
 import { NormalizedStory, RawStoryLike, RawStoryView } from "../../../shared/Types";
@@ -88,6 +90,21 @@ export default function StoryScreen({ route }: any) {
             setViewers([]);
         }
     }, [currentSubStory?.subId, currentUserId, isOwner]);
+
+    // Live-update the like count while the owner is watching their own story,
+    // instead of only reflecting likes gathered at the initial fetch above.
+    useEffect(() => {
+        if (!isOwner || !currentSubStory) return;
+        const subId = currentSubStory.subId;
+        const s = getSocket();
+        const handler = (n: AppNotification) => {
+            if (n.type === "story_liked" && (n.reference_id === subId || n.metadata?.subId === subId)) {
+                fetchStoryLikes(subId).then((data) => setLikers(data ?? [])).catch(console.error);
+            }
+        };
+        s?.on("notification", handler);
+        return () => { s?.off("notification", handler); };
+    }, [isOwner, currentSubStory?.subId]);
 
     // Restart progress bar whenever sub-story changes
     useEffect(() => {

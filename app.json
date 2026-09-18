@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "fuego",
+    "name": "Linked",
     "slug": "fuego",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.slamanii.fuego",
+      "bundleIdentifier": "com.slamanii.Linked",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -27,7 +27,7 @@
       "permissions": [
         "android.permission.CAMERA"
       ],
-      "package": "com.slamanii.fuego"
+      "package": "com.slamanii.Linked"
     },
     "web": {
       "output": "static",
@@ -47,7 +47,8 @@
         }
       ],
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

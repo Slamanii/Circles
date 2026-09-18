@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { TokenDetails } from "../../components/wallet/TokenDetails";
 import { WalletControlPanel } from "../../components/wallet/WalletControlPanel";
@@ -18,6 +18,8 @@ import {
 } from "../../hooks/useWalletConnection";
 import { authenticate, getBiometricEnabled } from "../../services/biometric";
 import { Currency, fetchNGNRate, formatFiat, getPreferredCurrency } from "../../services/currency";
+import { AppNotification } from "../../services/notifications";
+import { getSocket } from "../../services/socket";
 import { WalletHeader } from "./walletheader";
 
 // Survives tab switches; must be reset explicitly on logout
@@ -49,7 +51,16 @@ export default function WalletScreen() {
         activeWallet === CUSTODIAL ? storedAddress
         : activeWallet ?? "";
 
-    const { username, balance, onTxHistory, onSettings, openChart } = useWalletLogic(walletAddress);
+    const { username, balance, onTxHistory, onSettings, openChart, reload } = useWalletLogic(walletAddress);
+
+    useEffect(() => {
+        const s = getSocket();
+        const handler = (n: AppNotification) => {
+            if (n.type === "wallet_reservation_refunded" || n.type === "collectible_purchase_confirmed") reload();
+        };
+        s?.on("notification", handler);
+        return () => { s?.off("notification", handler); };
+    }, [reload]);
 
     // Focus: re-check the wallet gate + biometric + currency every time this tab is opened,
     // so "Switch Wallet" in Settings (which clears the stored choice) re-shows the gate.
@@ -228,7 +239,6 @@ export default function WalletScreen() {
                 onReceive={() => navigation.navigate("Wallet-recv", { tokens: tokenList })}
                 onSend={() => navigation.navigate("Wallet-send", { tokens: tokenList, walletAddress, activeWallet })}
                 onSwap={() => navigation.navigate("Wallet-swap", { tokens: tokenList, walletAddress, activeWallet })}
-                onBuy={() => navigation.navigate("Wallet-buy", { tokens: tokenList, walletAddress })}
             />
             <FlatList
                 data={tokenList}

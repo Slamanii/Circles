@@ -10,9 +10,18 @@ type Props = {
     onPin:    (id: string) => void;
     onReply:  (id: string) => void;
     onStar:   (id: string) => void;
+    onSelect: (id: string) => void;
+    onVotePoll: (id: string, optionIds: string[]) => void;
+    currentUserId: string | null;
+    selectionMode: boolean;
+    selectedIds: Set<string>;
+    onToggleSelect: (id: string) => void;
 };
 
-export function MessageList({ messages, onDelete, onShare, onPin, onReply, onStar }: Props) {
+export function MessageList({
+    messages, onDelete, onShare, onPin, onReply, onStar, onSelect, onVotePoll, currentUserId,
+    selectionMode, selectedIds, onToggleSelect,
+}: Props) {
     const C = getColors(useAppTheme().theme);
 
     const renderItem = ({ item, index }: any) => {
@@ -33,6 +42,12 @@ export function MessageList({ messages, onDelete, onShare, onPin, onReply, onSta
                     onPin={() => onPin(item.id)}
                     onReply={() => onReply(item.id)}
                     onStar={() => onStar(item.id)}
+                    onSelect={() => onSelect(item.id)}
+                    onVotePoll={optionIds => onVotePoll(item.id, optionIds)}
+                    currentUserId={currentUserId}
+                    selectionMode={selectionMode}
+                    selected={selectedIds.has(item.id)}
+                    onToggleSelect={() => onToggleSelect(item.id)}
                 />
             </View>
         );

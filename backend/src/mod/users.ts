@@ -1,4 +1,5 @@
 import { supabase } from "../services/supabase"
+import { notifyUser } from "../services/realtime"
 
 export async function getUser(userId: string) {
 
@@ -154,6 +155,20 @@ export async function followUser(
         })
 
     if (error) throw error
+
+    const { data: follower } = await supabase
+        .from("users")
+        .select("id, username, display_name")
+        .eq("id", userId)
+        .single();
+
+    await notifyUser(followingId, {
+        type: "follow_new",
+        body: `${follower?.display_name ?? follower?.username ?? "Someone"} started following you`,
+        reference_id: userId,
+        reference_type: "user",
+        metadata: { followerId: userId },
+    });
 
     return data
 }

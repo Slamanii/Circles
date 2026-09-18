@@ -58,12 +58,21 @@ export async function deleteMessage(messageId: string, deleteFor: "me" | "everyo
 export async function sendMessage(
     groupId: string,
     content: string,
-    type: "text" | "image" | "video" | "audio" = "text",
-    media?: { uri: string; thumbnail?: string; duration?: number },
+    type: "text" | "image" | "video" | "audio" | "gif" | "file" | "poll" = "text",
+    media?: {
+        uri?: string; thumbnail?: string; duration?: number; filename?: string; size?: number; mimeType?: string;
+        options?: { id: string; text: string }[]; multiSelect?: boolean;
+    },
     replyTo?: string,
 ) {
     return api.post<RawMessage>(
         "/api/send-message", { groupId, content, type, media, replyTo }, "Failed to send message"
+    );
+}
+
+export async function votePoll(messageId: string, optionIds: string[]) {
+    return api.post<{ votes: { user_id: string; option_id: string }[] }>(
+        "/api/vote-poll", { messageId, optionIds }, "Failed to vote"
     );
 }
 

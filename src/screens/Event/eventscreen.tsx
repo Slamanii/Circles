@@ -20,6 +20,8 @@ type SortKey = "forYou" | "date" | "price" | "location";
 import { Colors, getColors, Radius, TAB_PAD } from "../../shared/theme";
 import EventHeader from "./eventheader";
 import { useEventLogic } from "./eventlogic";
+import { AppNotification } from "../../services/notifications";
+import { getSocket } from "../../services/socket";
 
 const FILTERS: { key: SortKey; label: string }[] = [
     { key: "forYou",   label: "All Events" },
@@ -43,6 +45,15 @@ export default function EventScreen() {
 
     const { events, loading, error, reload, likedIds, savedIds, handleLike, handlePreSave, handleGetTicket } = useEventLogic();
     const { filtered } = useEventFilter(events, location);
+
+    useEffect(() => {
+        const s = getSocket();
+        const handler = (n: AppNotification) => {
+            if (n.type === "event_liked") reload();
+        };
+        s?.on("notification", handler);
+        return () => { s?.off("notification", handler); };
+    }, [reload]);
 
     // Debounce query
     const [debouncedQuery, setDebouncedQuery] = useState("");

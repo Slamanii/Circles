@@ -1,13 +1,15 @@
 import { supabase } from "../services/supabase";
 import { getProofByleaf } from "./events";
 import { transferCompressedNFT } from "../services/treasuryWallet/transferTicket";
+import { notifyUser } from "../services/realtime";
 
 export async function fetchUserCollectibles(userId: string) {
     const { data, error } = await supabase
         .from("collectibles")
         .select(`
             *,
-            events(title, event_date, venue)
+            events(title, event_date, venue, flyer_card),
+            tier:ticket_tiers(name, price, info, sort_order)
         `)
         .eq("owner_id", userId)
         .eq("custodian", "user")
@@ -31,6 +33,18 @@ export async function getCollectibleProof(assetId: string, userId: string) {
     return { proof, collectible };
 }
 
+export async function getCollectibleById(id: string, userId: string) {
+    const { data: collectible, error } = await supabase
+        .from("collectibles")
+        .select("*, events(title, event_date, venue, flyer_card), tier:ticket_tiers(name, price, info, sort_order)")
+        .eq("id", id)
+        .eq("owner_id", userId)
+        .single();
+
+    if (error || !collectible) throw new Error("You do not own this ticket");
+    return collectible;
+}
+
 /**
  * DB-only ticket transfer for the Collectibles screen's "send to a friend"
  * feature. No on-chain call — the treasury remains the leaf owner exactly as
@@ -49,7 +63,7 @@ export async function transferTicketInApp({
 }) {
     const { data: collectible, error } = await supabase
         .from("collectibles")
-        .select("*")
+        .select("*, events(title)")
         .eq("asset_id", assetId)
         .eq("owner_id", senderUserId)
         .eq("custodian", "user")
@@ -70,6 +84,14 @@ export async function transferTicketInApp({
         .from("collectibles")
         .update({ owner_id: recipientUserId })
         .eq("id", collectible.id);
+
+    await notifyUser(recipientUserId, {
+        type: "collectible_received",
+        body: `You received a ticket for "${collectible.events?.title}"`,
+        reference_id: collectible.id,
+        reference_type: "collectible",
+        metadata: { ticketId: collectible.id },
+    });
 
     return { transferred: true };
 }

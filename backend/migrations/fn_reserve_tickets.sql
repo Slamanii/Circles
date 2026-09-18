@@ -1,3 +1,7 @@
+-- Superseded by add_reservation_timeout.sql, which replaces this function
+-- (adds p_user_id + a stale-reservation sweep). Kept for history only —
+-- do not apply this file on its own after that migration has run.
+--
 -- Atomically reserves up to p_quantity pending tickets for an event.
 -- FOR UPDATE SKIP LOCKED ensures concurrent calls never claim the same row.
 CREATE OR REPLACE FUNCTION reserve_tickets(

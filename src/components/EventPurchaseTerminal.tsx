@@ -14,7 +14,7 @@ const METHODS = [
     { key: "wallet",   label: "Wallet" },
 ] as const;
 
-export default function PaymentTerminal({ onWallet, onPaystack }: any) {
+export default function PaymentTerminal({ onWallet, onPaystack, tierId, disabled = false }: any) {
     const { theme } = useAppTheme();
     const C = getColors(theme);
 
@@ -22,14 +22,16 @@ export default function PaymentTerminal({ onWallet, onPaystack }: any) {
     const [quantity, setQuantity] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
 
+    const canPay = !!selected && !!tierId && !disabled;
+
     const handlePayNow = async () => {
-        if (!selected) return;
+        if (!canPay) return;
         setIsLoading(true);
         try {
             if (selected === "paystack") {
-                await onPaystack(quantity);
+                await onPaystack(tierId, quantity);
             } else {
-                await onWallet(quantity);
+                await onWallet(tierId, quantity);
             }
         } catch (err) {
             console.error("Payment failed", err);
@@ -87,9 +89,9 @@ export default function PaymentTerminal({ onWallet, onPaystack }: any) {
             </View>
 
             <TouchableOpacity
-                style={[styles.payBtn, !selected && styles.payBtnDisabled]}
+                style={[styles.payBtn, !canPay && styles.payBtnDisabled]}
                 onPress={handlePayNow}
-                disabled={!selected || isLoading}
+                disabled={!canPay || isLoading}
             >
                 {isLoading
                     ? <ActivityIndicator color="white" />

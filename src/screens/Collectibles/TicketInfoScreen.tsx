@@ -1,11 +1,51 @@
 import { useNavigation } from "@react-navigation/native";
-import { Alert, Share, Text, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Alert, Share, Text, TouchableOpacity, View } from "react-native";
 import TicketControlCard from "../../components/TicketCard";
-import { Collectible } from "../../services/collectiblesService";
+import { Collectible, fetchCollectibleById } from "../../services/collectiblesService";
+import { AppNotification } from "../../services/notifications";
+import { getSocket } from "../../services/socket";
 
 export default function TicketInfoScreen({ route }: any) {
-    const ticket: Collectible = route.params.ticket;
+    const { ticket: initialTicket, ticketId } = route.params ?? {};
+    const [ticket, setTicket] = useState<Collectible | null>(initialTicket ?? null);
+    const [loading, setLoading] = useState(!initialTicket);
     const navigation = useNavigation<any>();
+
+    useEffect(() => {
+        if (initialTicket || !ticketId) return;
+        fetchCollectibleById(ticketId)
+            .then(setTicket)
+            .catch(err => console.error("TicketInfoScreen fetch failed", err))
+            .finally(() => setLoading(false));
+    }, [ticketId]);
+
+    useEffect(() => {
+        if (!ticket) return;
+        const s = getSocket();
+        const handler = async (n: AppNotification) => {
+            if (
+                (n.type === "collectible_received" || n.type === "collectible_purchase_confirmed") &&
+                n.reference_id === ticket.id
+            ) {
+                try {
+                    setTicket(await fetchCollectibleById(ticket.id));
+                } catch (err) {
+                    console.error("TicketInfoScreen refetch failed", err);
+                }
+            }
+        };
+        s?.on("notification", handler);
+        return () => { s?.off("notification", handler); };
+    }, [ticket?.id]);
+
+    if (loading || !ticket) {
+        return (
+            <View style={{ flex: 1, backgroundColor: "#0F172A", alignItems: "center", justifyContent: "center" }}>
+                <ActivityIndicator color="#60A5FA" />
+            </View>
+        );
+    }
 
     const handleMore = () => {
         Alert.alert(ticket.events?.title ?? "Ticket", undefined, [

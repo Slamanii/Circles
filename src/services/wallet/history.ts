@@ -1,9 +1,6 @@
-import { supabase } from "../supabase";
 import { api } from "../apiClient";
+import { supabase } from "../supabase";
 
-const HELIUS_RPC_URL = process.env.EXPO_PUBLIC_HELIUS_RPC_URL!;
-
-// ── Treasury endpoints (admin use) ──────────────────────────────────────────
 
 export async function fetchTreasuryTxHistoryService(limit: number = 50, offset: number = 0) {
     return api.get(
@@ -45,35 +42,16 @@ export type ParsedTx = {
 };
 
 /**
- * Fetches parsed transaction history for a wallet address via Helius.
- * Returns the most recent `limit` transactions directly from chain.
+ * Fetches parsed transaction history for a wallet address, proxied through
+ * the backend (keeps HELIUS_API_KEY server-side; the enhanced parsed-tx
+ * data this needs isn't available from a plain RPC call anyway).
  */
 export async function fetchWalletTxHistory(
     walletAddress: string,
     limit: number = 50
 ): Promise<ParsedTx[]> {
-    const res = await fetch(HELIUS_RPC_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: "tx-history",
-            method: "getSignaturesForAddress",
-            params: [walletAddress, { limit }],
-        }),
-    });
-
-    if (!res.ok) throw new Error("Failed to fetch transaction history");
-    const data = await res.json();
-
-    return (data.result ?? []).map((tx: any) => ({
-        signature: tx.signature,
-        type: tx.type ?? "UNKNOWN",
-        timestamp: tx.blockTime ?? 0,
-        fee: tx.fee ?? 0,
-        amount: tx.nativeTransfers?.[0]?.amount,
-        token: tx.tokenTransfers?.[0]?.mint,
-        from: tx.nativeTransfers?.[0]?.fromUserAccount,
-        to: tx.nativeTransfers?.[0]?.toUserAccount,
-    }));
+    return api.get<ParsedTx[]>(
+        `/api/fetch-wallet-tx-onchain?address=${encodeURIComponent(walletAddress)}&limit=${limit}`,
+        "Failed to fetch transaction history",
+    );
 }

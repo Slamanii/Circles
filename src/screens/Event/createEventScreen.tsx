@@ -69,13 +69,28 @@ export default function CreateEventScreen() {
     const [description, setDescription] = useState("");
     const [eventDate, setEventDate] = useState<Date | null>(null);
     const [venue, setVenue] = useState("");
-    const [ticketSupply, setTicketSupply] = useState("");
     const [message, setMessage] = useState("");
-    const [ticketPrice, setTicketPrice] = useState("");
     const [showPicker, setShowPicker] = useState(false);
     const [pickerMode, setPickerMode] = useState<"date" | "time">("date");
     const [loading, setLoading] = useState(false);
     const [flyerUri, setFlyerUri] = useState<string | null>(null);
+
+    // Base tier — always present, always required
+    const [baseSupply, setBaseSupply] = useState("");
+    const [basePrice, setBasePrice] = useState("");
+    const [baseInfo, setBaseInfo] = useState("");
+
+    // VIP tier — collapsed accordion, optional
+    const [vipOpen, setVipOpen] = useState(false);
+    const [vipSupply, setVipSupply] = useState("");
+    const [vipPrice, setVipPrice] = useState("");
+    const [vipInfo, setVipInfo] = useState("");
+
+    // VIP++ tier — collapsed accordion, optional, independent of VIP
+    const [vipPlusOpen, setVipPlusOpen] = useState(false);
+    const [vipPlusSupply, setVipPlusSupply] = useState("");
+    const [vipPlusPrice, setVipPlusPrice] = useState("");
+    const [vipPlusInfo, setVipPlusInfo] = useState("");
 
     const pickFlyer = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
@@ -87,14 +102,21 @@ export default function CreateEventScreen() {
         if (!result.canceled && result.assets[0]) setFlyerUri(result.assets[0].uri);
     };
 
-    const isValid = title.trim() && venue.trim() && ticketPrice.trim() && ticketSupply.trim() && eventDate;
+    const isValid = title.trim() && venue.trim() && basePrice.trim() && baseSupply.trim() && eventDate
+        && (!vipOpen || (vipPrice.trim() && vipSupply.trim()))
+        && (!vipPlusOpen || (vipPlusPrice.trim() && vipPlusSupply.trim()));
 
     const handleSubmit = async () => {
         if (!isValid || !eventDate) return;
-        const price = parseInt(ticketPrice, 10);
-        const supply = parseInt(ticketSupply, 10);
-        if (isNaN(price) || price < 0) { Alert.alert("Invalid price"); return; }
-        if (isNaN(supply) || supply < 1) { Alert.alert("Invalid ticket supply"); return; }
+
+        const tiers = [{ name: "Base", price: parseInt(basePrice, 10), supply: parseInt(baseSupply, 10), info: baseInfo.trim() || undefined }];
+        if (vipOpen) tiers.push({ name: "VIP", price: parseInt(vipPrice, 10), supply: parseInt(vipSupply, 10), info: vipInfo.trim() || undefined });
+        if (vipPlusOpen) tiers.push({ name: "VIP++", price: parseInt(vipPlusPrice, 10), supply: parseInt(vipPlusSupply, 10), info: vipPlusInfo.trim() || undefined });
+
+        for (const tier of tiers) {
+            if (isNaN(tier.price) || tier.price <= 0) { Alert.alert(`Invalid price for ${tier.name}`); return; }
+            if (isNaN(tier.supply) || tier.supply < 1) { Alert.alert(`Invalid ticket count for ${tier.name}`); return; }
+        }
         if (eventDate <= new Date()) { Alert.alert("Event date must be in the future"); return; }
 
         setLoading(true);
@@ -106,8 +128,7 @@ export default function CreateEventScreen() {
                 title: title.trim(),
                 description: (description.trim() || message.trim()) || undefined,
                 venue: venue.trim(),
-                ticketPrice: price,
-                ticketSupply: supply,
+                tiers,
                 eventDate: eventDate.toISOString(),
                 flyerCard,
             });
@@ -151,12 +172,46 @@ export default function CreateEventScreen() {
                 <FieldRow placeholder="Venue Name"     value={venue}       onChangeText={setVenue}       theme={theme} C={C} isLast />
             </View>
 
-            {/* Card 2 */}
+            {/* Card 2 — messages */}
             <View style={[styles.card, { backgroundColor: C.card }]}>
-                <FieldRow placeholder="No of Tickets"  value={ticketSupply} onChangeText={setTicketSupply} keyboardType="number-pad" theme={theme} C={C} />
-                <FieldRow placeholder="Messages"       value={message}      onChangeText={setMessage}      theme={theme} C={C} />
-                <FieldRow placeholder="Ticket Amount"  value={ticketPrice}  onChangeText={setTicketPrice}  keyboardType="number-pad" theme={theme} C={C} isLast />
+                <FieldRow placeholder="Messages" value={message} onChangeText={setMessage} theme={theme} C={C} isLast />
             </View>
+
+            {/* Ticket tiers: Base always shown, VIP / VIP++ are optional accordions */}
+            <Text style={[styles.sectionLabel, { color: C.textSecondary }]}>Base Tier</Text>
+            <View style={[styles.card, { backgroundColor: C.card }]}>
+                <FieldRow placeholder="No of Tickets" value={baseSupply} onChangeText={setBaseSupply} keyboardType="number-pad" theme={theme} C={C} />
+                <FieldRow placeholder="Ticket Amount" value={basePrice}  onChangeText={setBasePrice}  keyboardType="number-pad" theme={theme} C={C} />
+                <FieldRow placeholder="Tier Info (seating, perks, etc.)" value={baseInfo} onChangeText={setBaseInfo} theme={theme} C={C} isLast />
+            </View>
+
+            <TouchableOpacity
+                style={[styles.card, styles.accordionHeader, { backgroundColor: C.card }]}
+                onPress={() => setVipOpen(o => !o)}
+            >
+                <Text style={[styles.accordionText, { color: C.text }]}>{vipOpen ? "− Remove VIP" : "+ Add VIP"}</Text>
+            </TouchableOpacity>
+            {vipOpen && (
+                <View style={[styles.card, { backgroundColor: C.card }]}>
+                    <FieldRow placeholder="No of Tickets" value={vipSupply} onChangeText={setVipSupply} keyboardType="number-pad" theme={theme} C={C} />
+                    <FieldRow placeholder="Ticket Amount" value={vipPrice}  onChangeText={setVipPrice}  keyboardType="number-pad" theme={theme} C={C} />
+                    <FieldRow placeholder="Tier Info (seating, perks, etc.)" value={vipInfo} onChangeText={setVipInfo} theme={theme} C={C} isLast />
+                </View>
+            )}
+
+            <TouchableOpacity
+                style={[styles.card, styles.accordionHeader, { backgroundColor: C.card }]}
+                onPress={() => setVipPlusOpen(o => !o)}
+            >
+                <Text style={[styles.accordionText, { color: C.text }]}>{vipPlusOpen ? "− Remove VIP++" : "+ Add VIP++"}</Text>
+            </TouchableOpacity>
+            {vipPlusOpen && (
+                <View style={[styles.card, { backgroundColor: C.card }]}>
+                    <FieldRow placeholder="No of Tickets" value={vipPlusSupply} onChangeText={setVipPlusSupply} keyboardType="number-pad" theme={theme} C={C} />
+                    <FieldRow placeholder="Ticket Amount" value={vipPlusPrice}  onChangeText={setVipPlusPrice}  keyboardType="number-pad" theme={theme} C={C} />
+                    <FieldRow placeholder="Tier Info (seating, perks, etc.)" value={vipPlusInfo} onChangeText={setVipPlusInfo} theme={theme} C={C} isLast />
+                </View>
+            )}
 
             {showPicker && (
                 <DateTimePicker
@@ -244,4 +299,20 @@ const styles = StyleSheet.create({
     },
     flyerPreview: { width: "100%", height: "100%" },
     flyerPrompt: { fontSize: 14, fontWeight: "600" },
+    sectionLabel: {
+        fontSize: 12,
+        fontWeight: "700",
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        marginBottom: 8,
+        marginLeft: 4,
+    },
+    accordionHeader: {
+        paddingVertical: 16,
+        alignItems: "center",
+    },
+    accordionText: {
+        fontSize: 15,
+        fontWeight: "700",
+    },
 });

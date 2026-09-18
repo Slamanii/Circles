@@ -75,6 +75,17 @@ export default function UserScreen({ route }: any) {
                 style={styles.headerGradient}
                 pointerEvents="none"
             />
+
+            {isOwnProfile && (
+                <TouchableOpacity
+                    style={styles.walletBtn}
+                    onPress={() => navigation.navigate("WalletStack")}
+                    activeOpacity={0.85}
+                >
+                    <Text style={styles.walletBtnText}>Wallet</Text>
+                </TouchableOpacity>
+            )}
+
             <ScrollView
                 showsVerticalScrollIndicator={false}
                 refreshControl={
@@ -94,7 +105,7 @@ export default function UserScreen({ route }: any) {
                             <Image source={{ uri: avatar }} style={styles.avatar} />
                         ) : (
                             <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: C.surface }]}>
-                                <Ionicons name="person" size={44} color={C.textSecondary} />
+                                <Ionicons name="person" size={32} color={C.textSecondary} />
                             </View>
                         )}
 
@@ -400,7 +411,7 @@ const tabStyles = StyleSheet.create({
     gradientText: {
         paddingHorizontal: 4,
         paddingVertical: 2,
-        borderRadius: 2,
+        borderRadius: 10,
     },
     label: {
         fontSize: 15,
@@ -408,8 +419,8 @@ const tabStyles = StyleSheet.create({
         color: "#fff",
         letterSpacing: 0.2,
     },
-    lineRow: { flexDirection: "row" },
-    lineHalf: { flex: 1, height: 2.5 },
+    lineRow: { flexDirection: "row", gap: 4 },
+    lineHalf: { flex: 1, height: 3, borderRadius: 1.5 },
     lineInactive: { backgroundColor: "rgba(150,150,150,0.25)" },
 });
 
@@ -442,19 +453,34 @@ const styles = StyleSheet.create({
         right: 0,
         height: 360,
     },
+    walletBtn: {
+        position: "absolute",
+        top: 54,
+        right: 20,
+        zIndex: 10,
+        backgroundColor: Colors.accent,
+        borderRadius: 20,
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+    },
+    walletBtnText: {
+        color: "#fff",
+        fontSize: 13,
+        fontWeight: "700",
+    },
     profileBlock: {
-        paddingTop: 64,
+        paddingTop: 100,
         paddingBottom: 16,
         paddingHorizontal: 24,
     },
     profileRow: {
         flexDirection: "row",
-        alignItems: "flex-start",
+        alignItems: "center",
         gap: 16,
     },
-    avatar: { width: 130, height: 130, borderRadius: 65 },
+    avatar: { width: 92, height: 92, borderRadius: 46 },
     avatarFallback: { alignItems: "center", justifyContent: "center" },
-    profileInfo: { flex: 1, paddingTop: 4, gap: 5 },
+    profileInfo: { flex: 1, gap: 5 },
     nameRow: {
         flexDirection: "row",
         alignItems: "center",

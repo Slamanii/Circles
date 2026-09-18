@@ -1,14 +1,15 @@
 import { initiatePaystackPay, paystackWebhook } from "../services/paystack";
 import { getPaymentOptions, confirmWalletPurchase } from "../services/walletPay";
-import { fetchUserCollectibles, getCollectibleProof, transferTicketInApp } from "../mod/collectibles";
+import { fetchUserCollectibles, getCollectibleProof, getCollectibleById, transferTicketInApp } from "../mod/collectibles";
 import { AuthRequest } from "../mod/auth"
 import { Response } from "express"
 
 
 export async function getPaymentOptionsRouter(req: AuthRequest, res: Response) {
     try {
-        const { eventId, quantity } = req.body;
-        const result = await getPaymentOptions(eventId, Number(quantity));
+        const userId = req.user!.id;
+        const { eventId, tierId, quantity } = req.body;
+        const result = await getPaymentOptions(eventId, tierId, Number(quantity), userId);
         res.json(result);
     } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
@@ -19,8 +20,8 @@ export async function getPaymentOptionsRouter(req: AuthRequest, res: Response) {
 export async function confirmWalletPurchaseRouter(req: AuthRequest, res: Response) {
     try {
         const userId = req.user!.id;
-        const { eventId, txSignature, tokenMint, quantity } = req.body;
-        const result = await confirmWalletPurchase({ userId, eventId, txSignature, tokenMint, quantity: Number(quantity) });
+        const { eventId, tierId, txSignature, tokenMint } = req.body;
+        const result = await confirmWalletPurchase({ userId, eventId, tierId, txSignature, tokenMint });
         res.json(result);
     } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
@@ -31,8 +32,8 @@ export async function confirmWalletPurchaseRouter(req: AuthRequest, res: Respons
 export async function initiatePaystackPayRouter(req: AuthRequest, res: Response) {
     try {
         const userId = req.user!.id;
-        const { eventId, quantity } = req.body;
-        const result = await initiatePaystackPay({ userId, eventId, quantity });
+        const { eventId, tierId, quantity } = req.body;
+        const result = await initiatePaystackPay({ userId, eventId, tierId, quantity });
         res.json(result);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
@@ -84,6 +85,21 @@ export async function getTicketProofRouter(req: AuthRequest, res: Response) {
     try {
         const result = await getCollectibleProof(assetId, userId);
         res.json(result);
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Unknown error";
+        res.status(500).json({ error: errorMessage });
+    }
+}
+
+export async function getCollectibleByIdRouter(req: AuthRequest, res: Response) {
+    const userId = req.user!.id;
+    const { id } = req.query as { id: string };
+
+    if (!id) return res.status(400).json({ error: "id required" });
+
+    try {
+        const collectible = await getCollectibleById(id, userId);
+        res.json({ collectible });
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
         res.status(500).json({ error: errorMessage });

@@ -17,7 +17,7 @@ function ActionBtn({ icon, label, onPress }: ActionBtnProps) {
     );
 }
 
-export function WalletControlPanel({ solDisplay, fiatDisplay, onReceive, onSend, onSwap, onBuy }: WalletControlPanelType) {
+export function WalletControlPanel({ solDisplay, fiatDisplay, onReceive, onSend, onSwap }: WalletControlPanelType) {
     return (
         <View style={styles.container}>
             <Text style={styles.balance}>{solDisplay}</Text>
@@ -27,7 +27,6 @@ export function WalletControlPanel({ solDisplay, fiatDisplay, onReceive, onSend,
                 <ActionBtn icon="add-outline"             label="Receive" onPress={onReceive} />
                 <ActionBtn icon="arrow-up-outline"        label="Send"    onPress={onSend} />
                 <ActionBtn icon="swap-horizontal-outline" label="Swap"    onPress={onSwap} />
-                <ActionBtn icon="card-outline"            label="Buy"     onPress={onBuy} />
             </View>
         </View>
     );
@@ -60,7 +59,7 @@ const styles = StyleSheet.create({
         width: "100%",
     },
     actionBtn: {
-        width: 78,
+        width: 96,
         height: 54,
         borderRadius: 14,
         borderWidth: 2,
