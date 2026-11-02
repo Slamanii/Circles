@@ -2,7 +2,7 @@ import { Response } from "express";
 import { AuthRequest } from "../mod/auth";
 import { supabase } from "../services/supabase";
 
-const ALLOWED_BUCKETS = ["stories", "avatars", "event-flyers", "event-video", "chat"] as const;
+const ALLOWED_BUCKETS = ["stories", "avatar", "event_flyers", "event_video", "chat"] as const;
 type Bucket = (typeof ALLOWED_BUCKETS)[number];
 
 export async function getUploadUrlRouter(req: AuthRequest, res: Response) {

@@ -186,14 +186,22 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
       style={[
         tabStyles.bar,
         isDark
-          ? { shadowColor: "#000", shadowOpacity: 0.5 }
-          : { shadowColor: "#000", shadowOpacity: 0.18 },
+          ? { shadowColor: "#000", shadowOpacity: 0.5, borderColor: "rgba(255,255,255,0.14)" }
+          : { shadowColor: "#000", shadowOpacity: 0.18, borderColor: "rgba(255,255,255,0.4)" },
       ]}
     >
       <BlurView
         tint={isDark ? "dark" : "light"}
-        intensity={80}
+        intensity={60}
         style={[StyleSheet.absoluteFill, tabStyles.blurInner]}
+      />
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          tabStyles.blurInner,
+          { backgroundColor: isDark ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.22)" },
+        ]}
+        pointerEvents="none"
       />
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
@@ -284,6 +292,7 @@ const tabStyles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowRadius: 20,
     overflow: "hidden",
+    borderWidth: 1,
   },
   blurInner: {
     borderRadius: BAR_HEIGHT / 2,

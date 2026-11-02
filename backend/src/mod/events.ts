@@ -843,7 +843,7 @@ export async function burnExpiredTickets() {
 export async function getEventById(eventId: string, inviteToken?: string) {
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, description, venue, event_date, flyer_card, category, custom_category, video_url, invite_token, creator_id, ticket_supply, ticket_price, guest_list, status, cancellation_notice, ticket_tiers(id, name, price, supply, info, sort_order, group_ticket, free), collaborators:event_collaborators(users(id, username, avatar)), creator:users!events_creator_id_fkey(id, username, avatar)")
+    .select("id, title, description, venue, event_date, flyer_card, category, custom_category, video_url, invite_token, creator_id, ticket_supply, ticket_price, guest_list, status, cancellation_notice, ticket_tiers(id, name, price, supply, info, sort_order, group_ticket, free), collaborators:event_collaborators(users!event_collaborators_user_id_fkey(id, username, avatar)), creator:users!events_creator_id_fkey(id, username, avatar)")
     .eq("id", eventId)
     .single();
   if (error) throw error;
@@ -917,7 +917,7 @@ function countSoldSince(rows: { sold_at: string | null }[], cutoffMs: number): n
 export async function fetchEvents(limit: number = 50, offset: number = 0) {
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, description, ticket_price, ticket_supply, event_date, venue, creator_id, flyer_card, status, category, custom_category, video_url, guest_list, cancellation_notice, ticket_tiers(id, name, price, supply, info, sort_order, group_ticket, free), collaborators:event_collaborators(users(id, username, avatar)), creator:users!events_creator_id_fkey(id, username, avatar)")
+    .select("id, title, description, ticket_price, ticket_supply, event_date, venue, creator_id, flyer_card, status, category, custom_category, video_url, guest_list, cancellation_notice, ticket_tiers(id, name, price, supply, info, sort_order, group_ticket, free), collaborators:event_collaborators(users!event_collaborators_user_id_fkey(id, username, avatar)), creator:users!events_creator_id_fkey(id, username, avatar)")
     .in("status", ["active", "cancelled"])
     .neq("category", "private")
     .order("event_date", { ascending: true })

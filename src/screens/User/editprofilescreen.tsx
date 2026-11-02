@@ -84,7 +84,7 @@ export default function EditProfileScreen() {
         try {
             let avatarUrl = avatar ?? undefined;
             if (avatar && (avatar.startsWith("file://") || avatar.startsWith("ph://"))) {
-                avatarUrl = await uploadMedia(avatar, "avatars", "avatar.jpg", "image/jpeg");
+                avatarUrl = await uploadMedia(avatar, "avatar", "avatar.jpg", "image/jpeg");
             }
             await updateProfile({
                 display_name: displayName.trim() || undefined,

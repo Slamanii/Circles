@@ -120,8 +120,7 @@ const styles = StyleSheet.create({
     inner: {
         flex: 1,
         paddingHorizontal: 24,
-        paddingBottom: 50,
-        justifyContent: "flex-end",
+        justifyContent: "center",
     },
     card: {
         borderRadius: 28,

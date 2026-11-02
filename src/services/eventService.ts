@@ -14,11 +14,11 @@ export async function getEventById(eventId: string, token?: string) {
 }
 
 export async function uploadFlyer(uri: string): Promise<string> {
-    return uploadMedia(uri, "event-flyers", "flyer.jpg", "image/jpeg");
+    return uploadMedia(uri, "event_flyers", "flyer.jpg", "image/jpeg");
 }
 
 export async function uploadEventVideo(uri: string): Promise<string> {
-    return uploadMedia(uri, "event-video", "video.mp4", "video/mp4");
+    return uploadMedia(uri, "event_video", "video.mp4", "video/mp4");
 }
 
 export async function editEvent(eventId: string, patch: { eventDate?: string; venue?: string; guestList?: string }) {

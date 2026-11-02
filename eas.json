@@ -7,25 +7,33 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development"
+      "channel": "development",
+      "environment": "development",
+      "node": "22.12.0"
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
       },
-      "channel": "preview"
+      "channel": "preview",
+      "environment": "preview",
+      "node": "22.12.0"
     },
     "simulator": {
       "extends": "preview",
       "ios": {
         "simulator": true
       },
-      "channel": "simulator"
+      "channel": "simulator",
+      "environment": "preview",
+      "node": "22.12.0"
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "environment": "production",
+      "node": "22.12.0"
     }
   },
   "submit": {

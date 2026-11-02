@@ -1,6 +1,6 @@
 import { api } from "./apiClient";
 
-type Bucket = "stories" | "avatars" | "event-flyers" | "event-video" | "chat";
+type Bucket = "stories" | "avatar" | "event_flyers" | "event_video" | "chat";
 
 export async function uploadMedia(
     localUri: string,
