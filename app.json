@@ -25,7 +25,10 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ],
       "package": "com.slamanii.Linked"
     },
@@ -68,6 +71,12 @@
         "projectId": "4dfe9b4e-92d7-4dbb-bab3-f01df5f30c6f"
       }
     },
-    "owner": "slamanii"
+    "owner": "slamanii",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/4dfe9b4e-92d7-4dbb-bab3-f01df5f30c6f"
+    }
   }
 }

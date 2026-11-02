@@ -47,8 +47,12 @@ app-example
 /ios
 /android
 
-# Rust build artifacts
-target/
+# Rust build artifacts (except the generated IDL/types the backend imports at runtime)
+target/*
+!target/idl
+!target/idl/**
+!target/types
+!target/types/**
 
 # Backend
 backend/node_modules/
