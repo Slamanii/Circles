@@ -1,5 +1,6 @@
 import { createStory, viewStory, unlikeStory, likeStory, deleteSubStory, deleteStory, fetchStories,
-         fetchStoriesPreview, fetchStoryByUser, fetchStoryById, fetchStoryViews, fetchStoryLikes, fetchDiscoverStories }
+         fetchStoriesPreview, fetchStoryByUser, fetchStoryById, fetchStoryViews, fetchStoryLikes, fetchDiscoverStories,
+         addComment, deleteComment, fetchComments, likeComment, unlikeComment }
     from "../mod/stories"
 import { AuthRequest } from "../mod/auth"
 import { Response } from "express"
@@ -186,15 +187,75 @@ export async function fetchStoryViewsRouter(req: AuthRequest, res: Response) {
 export async function fetchStoryLikesRouter(req: AuthRequest, res: Response) {
   try {
 
-    const { subStoryId } = req.body;
+    const { storyId } = req.body;
 
-    const result = await fetchStoryLikes(subStoryId);
+    const result = await fetchStoryLikes(storyId);
 
     res.status(200).json(result);
 
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch story likes" });
+  }
+}
+
+export async function addCommentRouter(req: AuthRequest, res: Response) {
+  try {
+    const userId = req.user!.id;
+    const { storyId, content, parentCommentId } = req.body;
+    const result = await addComment({ storyId, userId, content, parentCommentId });
+    res.status(201).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to add comment";
+    res.status(500).json({ error: message });
+  }
+}
+
+export async function deleteCommentRouter(req: AuthRequest, res: Response) {
+  try {
+    const userId = req.user!.id;
+    const { commentId } = req.body;
+    const result = await deleteComment(commentId, userId);
+    res.status(200).json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete comment";
+    res.status(message === "Unauthorized" ? 403 : 500).json({ error: message });
+  }
+}
+
+export async function fetchCommentsRouter(req: AuthRequest, res: Response) {
+  try {
+    const viewerId = req.user!.id;
+    const { storyId } = req.query;
+    const result = await fetchComments(storyId as string, viewerId);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch comments" });
+  }
+}
+
+export async function likeCommentRouter(req: AuthRequest, res: Response) {
+  try {
+    const userId = req.user!.id;
+    const { commentId } = req.body;
+    const result = await likeComment({ commentId, userId });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to like comment" });
+  }
+}
+
+export async function unlikeCommentRouter(req: AuthRequest, res: Response) {
+  try {
+    const userId = req.user!.id;
+    const { commentId } = req.body;
+    const result = await unlikeComment({ commentId, userId });
+    res.status(200).json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to unlike comment" });
   }
 }
 

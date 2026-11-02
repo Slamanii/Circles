@@ -24,6 +24,7 @@ export function useUserLogic(followingId?: string) {
     const [followed, setFollowed] = useState(false);
     const [isOwnProfile, setIsOwnProfile] = useState(false);
     const [profileUserId, setProfileUserId] = useState<string | undefined>(followingId);
+    const [currentUserId, setCurrentUserId] = useState<string | undefined>(undefined);
     const [username, setUsername] = useState("");
     const [displayName, setDisplayName] = useState("");
     const [avatar, setAvatar] = useState<string | null>(null);
@@ -64,6 +65,7 @@ export function useUserLogic(followingId?: string) {
             setCanViewContent(profileData.canViewContent ?? true);
             setIsOwnProfile(!followingId || followingId === storedUser?.id);
             setProfileUserId(followingId ?? storedUser?.id);
+            setCurrentUserId(storedUser?.id);
 
             const [events, liked, stories] = await Promise.all([
                 fetchHostedEvents(followingId).catch(() => []),
@@ -127,7 +129,7 @@ export function useUserLogic(followingId?: string) {
 
     return {
         username, displayName, avatar, bio, link1, link2,
-        followers, following, profileUserId,
+        followers, following, profileUserId, currentUserId,
         hostedEvents, likedEvents, userStories,
         hostedVisible, likedVisible,
         showMoreHosted, showMoreLiked,

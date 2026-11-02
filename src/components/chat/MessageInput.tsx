@@ -31,7 +31,9 @@ export function MessageInput({
     recording = false, replyingTo, onCancelReply, members = [],
     panelOpen, onTogglePanel, onOpenAttachPanel, onInputFocus,
 }: Props) {
-    const C = getColors(useAppTheme().theme);
+    const { theme } = useAppTheme();
+    const C = getColors(theme);
+    const barBackground = theme === "dark" ? "#000" : C.card;
     const [mentionQuery, setMentionQuery] = useState<string | null>(null);
 
     // Detect @mention context every time text changes
@@ -58,7 +60,7 @@ export function MessageInput({
         <View>
             {/* @mention suggestions */}
             {suggestions.length > 0 && (
-                <View style={[styles.suggestionsBox, { backgroundColor: C.card, borderTopColor: C.border }]}>
+                <View style={[styles.suggestionsBox, { backgroundColor: barBackground, borderTopColor: C.border }]}>
                     <FlatList
                         data={suggestions}
                         keyExtractor={m => m.user_id}
@@ -79,7 +81,7 @@ export function MessageInput({
 
             {/* Reply banner */}
             {replyingTo && (
-                <View style={[styles.replyBanner, { backgroundColor: C.surface, borderLeftColor: C.accent }]}>
+                <View style={[styles.replyBanner, { backgroundColor: barBackground, borderLeftColor: C.accent }]}>
                     <View style={styles.replyInfo}>
                         <Text style={[styles.replyLabel, { color: C.accent }]}>
                             Replying to {replyingTo.senderName}
@@ -95,7 +97,7 @@ export function MessageInput({
             )}
 
             {/* Input row */}
-            <View style={[styles.row, { borderTopColor: C.border, backgroundColor: C.card }]}>
+            <View style={[styles.row, { borderTopColor: C.border, backgroundColor: barBackground }]}>
                 <TouchableOpacity onPress={onOpenAttachPanel} style={styles.iconBtn}>
                     <Ionicons name="add-circle-outline" size={26} color={C.textSecondary} />
                 </TouchableOpacity>

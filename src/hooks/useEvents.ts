@@ -9,7 +9,11 @@ export type TicketTier = {
     info: string | null;
     sort_order: number;
     remaining: number;
+    group_ticket: number | null;
+    free: boolean;
 };
+
+export type EventCategory = "movie" | "professional" | "concert" | "birthday" | "sports" | "educational" | "private" | "other";
 
 export type Event = {
     id: string;
@@ -20,8 +24,16 @@ export type Event = {
     event_date: string;   // ISO timestamp
     venue: string;
     creator_id: string;
-    flyer_card: string | null;
+    flyer_card: string[] | null;
     status: "active" | "expired" | "cancelled";
+    category: EventCategory;
+    custom_category: string | null;
+    guest_list: string | null;
+    cancellation_notice: string | null;
+    collaborators: { id: string; username: string; avatar: string | null }[];
+    creator: { id: string; username: string; avatar: string | null } | null;
+    recent_likes_count: number;
+    video_url: string | null;
     ticket_tiers: TicketTier[];
 };
 

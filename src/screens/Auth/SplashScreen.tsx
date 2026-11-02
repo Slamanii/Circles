@@ -5,7 +5,7 @@ export default function SplashScreen() {
     return (
         <View style={styles.container}>
             <Text style={styles.logo}>fuego</Text>
-            <ActivityIndicator color={Colors.accent} size="small" style={styles.spinner} />
+            <ActivityIndicator color={Colors.accentText} size="small" style={styles.spinner} />
         </View>
     );
 }
@@ -21,7 +21,7 @@ const styles = StyleSheet.create({
     logo: {
         fontSize: 48,
         fontWeight: "900",
-        color: Colors.accent,
+        color: Colors.accentText,
         letterSpacing: -1,
     },
     spinner: {

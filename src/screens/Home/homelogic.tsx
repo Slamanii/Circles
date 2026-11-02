@@ -11,6 +11,8 @@ export function useHomeLogic() {
 
     const [location, setLocation] = useState<string>("");
     const [username, setUsername] = useState<string>("");
+    const [displayName, setDisplayName] = useState<string>("");
+    const [avatar, setAvatar] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useFocusEffect(
@@ -20,6 +22,8 @@ export function useHomeLogic() {
                     const data = await getUser();
                     setLocation(data.location || "");
                     setUsername(data.username);
+                    setDisplayName(data.display_name || data.username);
+                    setAvatar(data.avatar ?? null);
                 } catch (err) {
                     setError("Failed to load user data");
                     console.error(err);
@@ -52,18 +56,15 @@ export function useHomeLogic() {
         navigation.navigate("checkout", { eventId });
     };
 
-    const onEventPress = (eventId: string) => {
-        navigation.navigate("EventDetails", { eventId });
-    };
-
     return {
         error,
         location,
         username,
+        displayName,
+        avatar,
         updateLocation,
         onChatPress,
         handlePreSave,
         handleGetTicket,
-        onEventPress,
     };
 }

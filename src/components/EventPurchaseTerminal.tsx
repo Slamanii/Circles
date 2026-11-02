@@ -14,7 +14,7 @@ const METHODS = [
     { key: "wallet",   label: "Wallet" },
 ] as const;
 
-export default function PaymentTerminal({ onWallet, onPaystack, tierId, disabled = false }: any) {
+export default function PaymentTerminal({ onWallet, onPaystack, onFreeClaim, isFree = false, tierId, disabled = false }: any) {
     const { theme } = useAppTheme();
     const C = getColors(theme);
 
@@ -22,13 +22,15 @@ export default function PaymentTerminal({ onWallet, onPaystack, tierId, disabled
     const [quantity, setQuantity] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
 
-    const canPay = !!selected && !!tierId && !disabled;
+    const canPay = isFree ? (!!tierId && !disabled) : (!!selected && !!tierId && !disabled);
 
     const handlePayNow = async () => {
         if (!canPay) return;
         setIsLoading(true);
         try {
-            if (selected === "paystack") {
+            if (isFree) {
+                await onFreeClaim(tierId, quantity);
+            } else if (selected === "paystack") {
                 await onPaystack(tierId, quantity);
             } else {
                 await onWallet(tierId, quantity);
@@ -64,29 +66,31 @@ export default function PaymentTerminal({ onWallet, onPaystack, tierId, disabled
                 </View>
             </View>
 
-            {/* Payment method */}
-            <View style={[styles.card, { backgroundColor: C.card }]}>
-                {METHODS.map((m, i) => (
-                    <View key={m.key}>
-                        <TouchableOpacity
-                            style={styles.row}
-                            onPress={() => setSelected(m.key)}
-                            activeOpacity={0.7}
-                        >
-                            <Text style={[styles.rowLabel, { color: C.text }]}>{m.label}</Text>
-                            <View style={[
-                                styles.radio,
-                                { borderColor: selected === m.key ? Colors.accent : C.textSecondary },
-                            ]}>
-                                {selected === m.key && <View style={styles.radioFill} />}
-                            </View>
-                        </TouchableOpacity>
-                        {i < METHODS.length - 1 && (
-                            <View style={[styles.divider, { backgroundColor: dividerColor(theme) }]} />
-                        )}
-                    </View>
-                ))}
-            </View>
+            {/* Payment method — skipped entirely for a free tier */}
+            {!isFree && (
+                <View style={[styles.card, { backgroundColor: C.card }]}>
+                    {METHODS.map((m, i) => (
+                        <View key={m.key}>
+                            <TouchableOpacity
+                                style={styles.row}
+                                onPress={() => setSelected(m.key)}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={[styles.rowLabel, { color: C.text }]}>{m.label}</Text>
+                                <View style={[
+                                    styles.radio,
+                                    { borderColor: selected === m.key ? C.accentText : C.textSecondary },
+                                ]}>
+                                    {selected === m.key && <View style={styles.radioFill} />}
+                                </View>
+                            </TouchableOpacity>
+                            {i < METHODS.length - 1 && (
+                                <View style={[styles.divider, { backgroundColor: dividerColor(theme) }]} />
+                            )}
+                        </View>
+                    ))}
+                </View>
+            )}
 
             <TouchableOpacity
                 style={[styles.payBtn, !canPay && styles.payBtnDisabled]}
@@ -94,8 +98,8 @@ export default function PaymentTerminal({ onWallet, onPaystack, tierId, disabled
                 disabled={!canPay || isLoading}
             >
                 {isLoading
-                    ? <ActivityIndicator color="white" />
-                    : <Text style={styles.payText}>Pay Now</Text>
+                    ? <ActivityIndicator color={Colors.black} />
+                    : <Text style={styles.payText}>{isFree ? "Get Free Ticket" : "Pay Now"}</Text>
                 }
             </TouchableOpacity>
         </View>
@@ -146,7 +150,7 @@ const styles = StyleSheet.create({
         backgroundColor: "#ccc",
     },
     payText: {
-        color: "white",
+        color: Colors.black,
         fontWeight: "700",
         fontSize: 15,
     },

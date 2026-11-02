@@ -14,8 +14,22 @@ type Props = {
     onGetTicket: () => void;
 };
 
+const CATEGORY_LABELS: Record<string, string> = {
+    movie: "Movie",
+    professional: "Professional",
+    concert: "Concert",
+    birthday: "Birthday",
+    sports: "Sports",
+    educational: "Educational",
+    private: "Private",
+    other: "Other",
+};
+
 export default function EventCard({ event, liked, saved, onLike, onPreSave, onGetTicket }: Props) {
     const C = getColors(useAppTheme().theme);
+    const categoryLabel = event.category === "other" && event.custom_category
+        ? event.custom_category
+        : CATEGORY_LABELS[event.category];
 
     const dateLabel = event.event_date
         ? new Date(event.event_date).toLocaleDateString("en-GB", {
@@ -32,6 +46,12 @@ export default function EventCard({ event, liked, saved, onLike, onPreSave, onGe
                     <Text style={[styles.title, { color: C.text }]} numberOfLines={2}>
                         {event.title}
                     </Text>
+
+                    {categoryLabel ? (
+                        <View style={[styles.categoryBadge, { backgroundColor: C.accentText + "22" }]}>
+                            <Text style={[styles.categoryBadgeText, { color: C.accentText }]}>{categoryLabel}</Text>
+                        </View>
+                    ) : null}
 
                     <View style={styles.metaRow}>
                         <Ionicons name="calendar-outline" size={13} color={C.textSecondary} />
@@ -52,15 +72,22 @@ export default function EventCard({ event, liked, saved, onLike, onPreSave, onGe
 
                 {/* Right: flyer */}
                 <View style={styles.flyerCol}>
-                    {event.flyer_card ? (
-                        <Image source={{ uri: event.flyer_card }} style={styles.flyer} />
-                    ) : (
-                        <View style={styles.flyerPlaceholder}>
-                            <Text style={styles.flyerInitial}>
-                                {event.title?.[0]?.toUpperCase() ?? "E"}
-                            </Text>
-                        </View>
-                    )}
+                    <View style={styles.flyerClip}>
+                        {event.flyer_card?.[0] ? (
+                            <Image source={{ uri: event.flyer_card[0] }} style={styles.flyer} />
+                        ) : (
+                            <View style={[styles.flyerPlaceholder, { backgroundColor: C.accentText + "18", borderColor: C.accentText + "50" }]}>
+                                <Text style={[styles.flyerInitial, { color: C.accentText }]}>
+                                    {event.title?.[0]?.toUpperCase() ?? "E"}
+                                </Text>
+                            </View>
+                        )}
+                        {event.status === "cancelled" && (
+                            <View style={styles.cancelledRibbon}>
+                                <Text style={styles.cancelledRibbonText}>CANCELLED</Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
             </View>
 
@@ -72,7 +99,7 @@ export default function EventCard({ event, liked, saved, onLike, onPreSave, onGe
                     <Ionicons
                         name={saved ? "bookmark" : "bookmark-outline"}
                         size={21}
-                        color={saved ? Colors.accent : C.textSecondary}
+                        color={saved ? C.accentText : C.textSecondary}
                     />
                 </TouchableOpacity>
 
@@ -84,7 +111,7 @@ export default function EventCard({ event, liked, saved, onLike, onPreSave, onGe
                     />
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={onGetTicket} style={styles.ticketBtn}>
+                <TouchableOpacity onPress={onGetTicket} style={[styles.ticketBtn, { backgroundColor: Colors.accent }]}>
                     <Text style={styles.ticketText}>Get Tickets</Text>
                 </TouchableOpacity>
             </View>
@@ -118,6 +145,17 @@ const styles = StyleSheet.create({
         fontWeight: "800",
         lineHeight: 22,
     },
+    categoryBadge: {
+        alignSelf: "flex-start",
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        marginTop: 4,
+    },
+    categoryBadgeText: {
+        fontSize: 11,
+        fontWeight: "700",
+    },
     metaRow: {
         flexDirection: "row",
         alignItems: "center",
@@ -135,6 +173,30 @@ const styles = StyleSheet.create({
     flyerCol: {
         justifyContent: "center",
     },
+    flyerClip: {
+        width: 90,
+        height: 100,
+        borderRadius: Radius.md,
+        overflow: "hidden",
+        position: "relative",
+    },
+    cancelledRibbon: {
+        position: "absolute",
+        top: 36,
+        left: -25,
+        width: 140,
+        paddingVertical: 4,
+        backgroundColor: "#D64545",
+        alignItems: "center",
+        justifyContent: "center",
+        transform: [{ rotate: "-40deg" }],
+    },
+    cancelledRibbonText: {
+        color: "#fff",
+        fontSize: 10,
+        fontWeight: "800",
+        letterSpacing: 0.5,
+    },
     flyer: {
         width: 90,
         height: 100,
@@ -144,16 +206,13 @@ const styles = StyleSheet.create({
         width: 90,
         height: 100,
         borderRadius: Radius.md,
-        backgroundColor: Colors.accent + "18",
         borderWidth: 1.5,
-        borderColor: Colors.accent + "50",
         justifyContent: "center",
         alignItems: "center",
     },
     flyerInitial: {
         fontSize: 32,
         fontWeight: "800",
-        color: Colors.accent,
     },
     divider: {
         height: StyleSheet.hairlineWidth,
@@ -171,14 +230,13 @@ const styles = StyleSheet.create({
     },
     ticketBtn: {
         flex: 1,
-        backgroundColor: Colors.accent,
         borderRadius: Radius.full,
         paddingVertical: 10,
         alignItems: "center",
         marginLeft: 6,
     },
     ticketText: {
-        color: Colors.white,
+        color: Colors.black,
         fontSize: 14,
         fontWeight: "700",
         letterSpacing: 0.3,

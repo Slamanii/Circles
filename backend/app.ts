@@ -5,13 +5,13 @@ import rateLimit from "express-rate-limit"
 import http from "http"
 import { initRealtime } from "./src/services/realtime"
 import { requireUser, requireCronSecret, requireStepUp } from "./src/mod/auth"
-import { loginOrSignupRouter, resetPasswordRouter, savePushTokenRouter, getNonceRouter, deleteAccountRouter, exportWalletSecretRouter, linkWalletRouter, listLinkedWalletsRouter, reauthRouter } from "./src/routes/auth"
+import { loginOrSignupRouter, requestPasswordResetRouter, resetPasswordRouter, savePushTokenRouter, getNonceRouter, deleteAccountRouter, exportWalletSecretRouter, linkWalletRouter, listLinkedWalletsRouter, reauthRouter } from "./src/routes/auth"
 import { deleteMessageRouter, pinMessageRouter, fetchUserGroupsRouter, createGroupChatRouter, deleteGroupRouter, fetchMessagesRouter, fetchUnreadNotificationsRouter, getGroupRouter, getUnreadCountRouter, leaveGroupRouter, makeAdminRouter, markAsReadRouter, markNotificationsReadRouter, removeMemberRouter, sendMessageRouter, starMessageRouter, unstarMessageRouter, fetchStarredIdsRouter, fetchNotificationsRouter, votePollRouter } from "./src/routes/chat"
-import { fetchCollectiblesRouter, getTicketProofRouter, getCollectibleByIdRouter, transferTicketRouter, initiatePaystackPayRouter, getPaymentOptionsRouter, confirmWalletPurchaseRouter, initiatepaystackWebhookRouter, paystackReturn } from "./src/routes/collectibles"
-import { createEventRouter, expireEventsRouter, burnExpiredTicketsRouter, fetchEventsRouter, likeEventRouter, mintTicketsRouter, resumeStuckMintsRouter, preSaveRouter, eventMetadataRouter, ticketMetadataRouter, uploadFlyerRouter, eventStatsRouter } from "./src/routes/events"
+import { fetchCollectiblesRouter, getTicketProofRouter, getCollectibleByIdRouter, transferTicketRouter, initiatePaystackPayRouter, getPaymentOptionsRouter, confirmWalletPurchaseRouter, initiatepaystackWebhookRouter, paystackReturn, claimFreeTicketRouter, validateTicketRouter } from "./src/routes/collectibles"
+import { createEventRouter, expireEventsRouter, burnExpiredTicketsRouter, fetchEventsRouter, likeEventRouter, mintTicketsRouter, resumeStuckMintsRouter, preSaveRouter, eventMetadataRouter, ticketMetadataRouter, uploadFlyerRouter, eventStatsRouter, getEventByIdRouter, updateEventRouter, addCollaboratorRouter, removeCollaboratorRouter, cancelEventRouter, grantScanAccessRouter, revokeScanAccessRouter, fetchScanGrantsRouter, fetchScannableEventsRouter } from "./src/routes/events"
 import { resumeStuckMints } from "./src/mod/events"
-import { createStoryRouter, deleteStoryRouter, deleteSubStoryRouter, fetchDiscoverStoriesRouter, fetchStoriesPreviewRouter, fetchStoriesRouter, fetchStoryByIdRouter, fetchStoryByUserRouter, fetchStoryLikesRouter, fetchStoryViewsRouter, likeStoryRouter, unlikeStoryRouter, viewStoryRouter } from "./src/routes/stories"
-import { getUserRouter, getUserProfileRouter, searchUsersRouter, fetchEventLikesRouter, fetchFollowersRouter, fetchFollowingRouter, fetchHostedEventsRouter, fetchLikedEventsRouter, followUserRouter, unfollowUserRouter, updateProfileRouter } from "./src/routes/user"
+import { createStoryRouter, deleteStoryRouter, deleteSubStoryRouter, fetchDiscoverStoriesRouter, fetchStoriesPreviewRouter, fetchStoriesRouter, fetchStoryByIdRouter, fetchStoryByUserRouter, fetchStoryLikesRouter, fetchStoryViewsRouter, likeStoryRouter, unlikeStoryRouter, viewStoryRouter, addCommentRouter, deleteCommentRouter, fetchCommentsRouter, likeCommentRouter, unlikeCommentRouter } from "./src/routes/stories"
+import { getUserRouter, getUserProfileRouter, searchUsersRouter, fetchEventLikesRouter, fetchFollowersRouter, fetchFollowingRouter, fetchHostedEventsRouter, fetchLikedEventsRouter, followUserRouter, unfollowUserRouter, updateProfileRouter, topCreatorsRouter } from "./src/routes/user"
 import { fetchTreasuryTxHistoryRouter, fetchTxHistoryOnchainRouter, fetchWalletTxHistoryOnchainRouter, signAndSendRouter } from "./src/routes/wallet"
 import { getUploadUrlRouter } from "./src/routes/upload"
 import { giphySearchRouter } from "./src/routes/giphy"
@@ -63,6 +63,7 @@ const authLimiter = rateLimit({
 });
 
 router.post("/login", authLimiter, loginOrSignupRouter);
+router.post("/request-password-reset", authLimiter, requestPasswordResetRouter);
 router.post("/reset-password", authLimiter, resetPasswordRouter);
 router.post("/delete-account", requireUser, deleteAccountRouter);
 router.get("/export-secret", requireUser, requireStepUp("export-secret"), exportWalletSecretRouter);
@@ -83,9 +84,23 @@ router.get("/fetch-story-by-id", requireUser, fetchStoryByIdRouter);
 router.get("/fetch-discover-stories", requireUser, fetchDiscoverStoriesRouter);
 router.get("/fetch-storyviews", requireUser, fetchStoryViewsRouter);
 router.post("/fetch-storylikes", requireUser, fetchStoryLikesRouter);
+router.post("/add-comment", requireUser, addCommentRouter);
+router.post("/delete-comment", requireUser, deleteCommentRouter);
+router.get("/fetch-comments", requireUser, fetchCommentsRouter);
+router.post("/like-comment", requireUser, likeCommentRouter);
+router.post("/unlike-comment", requireUser, unlikeCommentRouter);
 
 
 router.get("/fetch-events", requireUser, fetchEventsRouter);
+router.get("/event/:id", requireUser, getEventByIdRouter);
+router.put("/event/:id", requireUser, updateEventRouter);
+router.post("/event/:id/collaborators", requireUser, addCollaboratorRouter);
+router.post("/event/:id/collaborators/remove", requireUser, removeCollaboratorRouter);
+router.post("/event/:id/cancel", requireUser, cancelEventRouter);
+router.post("/event/:id/scan-grants", requireUser, grantScanAccessRouter);
+router.post("/event/:id/scan-grants/remove", requireUser, revokeScanAccessRouter);
+router.get("/event/:id/scan-grants", requireUser, fetchScanGrantsRouter);
+router.get("/scannable-events", requireUser, fetchScannableEventsRouter);
 router.post("/upload-flyer", requireUser, uploadFlyerRouter);
 router.post("/upload-url", requireUser, getUploadUrlRouter);
 router.get("/giphy-search", requireUser, giphySearchRouter);
@@ -99,11 +114,13 @@ router.post("/burn-expired-tickets", requireCronSecret, burnExpiredTicketsRouter
 router.post("/resume-stuck-mints", requireCronSecret, resumeStuckMintsRouter);
 
 router.post("/payment-options", requireUser, getPaymentOptionsRouter);
+router.post("/claim-free-ticket", requireUser, claimFreeTicketRouter);
 router.post("/confirm-wallet-purchase", requireUser, confirmWalletPurchaseRouter);
 router.get("/fetch-collectibles", requireUser, fetchCollectiblesRouter);
 router.get("/get-ticket-proof", requireUser, getTicketProofRouter);
 router.get("/get-collectible", requireUser, getCollectibleByIdRouter);
 router.post("/transfer-ticket", requireUser, transferTicketRouter);
+router.post("/validate-ticket", requireUser, validateTicketRouter);
 router.get("/fetch-treasury-tx", requireUser, fetchTreasuryTxHistoryRouter);
 router.get("/fetch-treasury-tx-onchain", requireUser, fetchTxHistoryOnchainRouter);
 router.get("/fetch-wallet-tx-onchain", requireUser, fetchWalletTxHistoryOnchainRouter);
@@ -119,6 +136,7 @@ router.put("/update-profile", requireUser, updateProfileRouter);
 router.get("/get-user-profile", requireUser, getUserProfileRouter);
 router.get("/fetch-liked-events", requireUser, fetchLikedEventsRouter);
 router.get("/search-users", requireUser, searchUsersRouter);
+router.get("/top-creators", requireUser, topCreatorsRouter);
 router.post("/fetch-followers", requireUser, fetchFollowersRouter);
 router.post("/fetch-following", requireUser, fetchFollowingRouter);
 router.post("/follow-user", requireUser, followUserRouter);

@@ -20,6 +20,7 @@ import { authenticate, getBiometricEnabled } from "../../services/biometric";
 import { Currency, fetchNGNRate, formatFiat, getPreferredCurrency } from "../../services/currency";
 import { AppNotification } from "../../services/notifications";
 import { getSocket } from "../../services/socket";
+import { Colors } from "../../shared/theme";
 import { WalletHeader } from "./walletheader";
 
 // Survives tab switches; must be reset explicitly on logout
@@ -163,7 +164,7 @@ export default function WalletScreen() {
 
     const handleCancelLink = () => setPendingAccount(null);
 
-    if (loading) return <ActivityIndicator style={styles.center} color="#E8622A" />;
+    if (loading) return <ActivityIndicator style={styles.center} color={Colors.accentText} />;
 
     if (biometricLocked) return (
         <View style={styles.center}>
@@ -177,7 +178,7 @@ export default function WalletScreen() {
 
     if (pendingAccount) return (
         <View style={styles.center}>
-            <Ionicons name="wallet-outline" size={40} color="#E8622A" />
+            <Ionicons name="wallet-outline" size={40} color={Colors.accentText} />
             <Text style={styles.gateTitle}>Link this wallet?</Text>
             <Text style={styles.pendingAddress}>{shortAddr(pendingAccount.address.toBase58())}</Text>
             <TouchableOpacity style={styles.connectBtn} onPress={handleConfirmLink} disabled={linking}>
@@ -208,7 +209,7 @@ export default function WalletScreen() {
             ))}
             <TouchableOpacity style={styles.connectBtnSecondary} onPress={handleStartLink} disabled={connecting}>
                 {connecting
-                    ? <ActivityIndicator color="#E8622A" />
+                    ? <ActivityIndicator color={Colors.accentText} />
                     : <Text style={styles.connectTextSecondary}>Link Wallet</Text>}
             </TouchableOpacity>
         </View>
@@ -265,8 +266,8 @@ const styles = StyleSheet.create({
     center:      { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#2E2D2D", gap: 12 },
     gateTitle:   { color: "#fff", fontSize: 17, fontWeight: "700", marginBottom: 4 },
     pendingAddress: { color: "#9CA3AF", fontSize: 14, marginBottom: 12 },
-    connectBtn:  { backgroundColor: "#E8622A", paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 },
-    connectText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+    connectBtn:  { backgroundColor: Colors.accent, paddingHorizontal: 28, paddingVertical: 14, borderRadius: 14 },
+    connectText: { color: Colors.black, fontWeight: "700", fontSize: 15 },
     connectBtnSecondary: {
         backgroundColor: "#3A3939",
         paddingHorizontal: 28,

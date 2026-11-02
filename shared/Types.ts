@@ -77,22 +77,39 @@ export type RawStoryLike = {
     users?: { username: string; avatar?: string | null } | null;
 };
 
+export type StoryComment = {
+    id: string;
+    parent_comment_id: string | null;
+    content: string;
+    created_at: string;
+    user_id: string;
+    users?: { username: string; avatar?: string | null } | null;
+    likeCount: number;
+    likedByViewer: boolean;
+};
+
 export type EventStats = {
     title: string;
     ticketSupply: number;
     ticketPrice: number;
+    remaining: number;
     totalLikes: number;
     minted: number;
     sold: number;
     revenue: number;
+    salesLastDay: number;
+    salesLastWeek: number;
+    salesLastMonth: number;
+    salesLast3Months: number;
 };
 
 export type RawEventSummary = {
     id: string;
     title: string;
-    flyer_card?: string | null;
+    flyer_card?: string[] | null;
     venue?: string | null;
     event_date?: string | null;
+    creator_id?: string;
 };
 
 export type EventCard = {
@@ -133,11 +150,8 @@ export type TicketMint = {
 };
 
 export type ChatListHeaderProps = {
-  username: string;
   onBack?: () => void;
-  onToggleSelection: () => void;
-  archiveFilter: "all" | "archived"  | "deleted" | "pending";
-  onFilterChange: (filter: "all" | "archived" | "deleted" | "pending") => void;
+  onNotificationsPress: () => void;
 };
 
 export type ChatPreviewItemProps = {

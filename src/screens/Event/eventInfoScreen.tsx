@@ -60,7 +60,16 @@ export default function EventInfoScreen({ route }: any) {
                     <Ionicons name="chevron-back" size={24} color={C.text} />
                 </TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: C.text }]}>Event Info</Text>
-                <View style={{ width: 24 }} />
+                {stats ? (
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate("EventEdit", { eventId })}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                        <Ionicons name="create-outline" size={22} color={C.text} />
+                    </TouchableOpacity>
+                ) : (
+                    <View style={{ width: 24 }} />
+                )}
             </View>
 
             {loading ? (
@@ -81,7 +90,16 @@ export default function EventInfoScreen({ route }: any) {
                         <StatCard C={C} icon="heart" label="Total Likes" value={stats.totalLikes} />
                         <StatCard C={C} icon="ticket" label="Tickets Sold" value={`${stats.sold} / ${stats.ticketSupply}`} />
                         <StatCard C={C} icon="cube" label="Tickets Minted" value={`${stats.minted} / ${stats.ticketSupply}`} />
+                        <StatCard C={C} icon="layers" label="Remaining" value={`${stats.remaining} / ${stats.ticketSupply}`} />
                         <StatCard C={C} icon="cash" label="Revenue" value={stats.revenue} />
+                    </View>
+
+                    <Text style={[styles.sectionTitle, { color: C.text }]}>Sales Over Time</Text>
+                    <View style={styles.statsGrid}>
+                        <StatCard C={C} icon="today" label="Last 24 Hours" value={stats.salesLastDay} />
+                        <StatCard C={C} icon="calendar" label="Last 7 Days" value={stats.salesLastWeek} />
+                        <StatCard C={C} icon="calendar-outline" label="Last 30 Days" value={stats.salesLastMonth} />
+                        <StatCard C={C} icon="stats-chart" label="Last 3 Months" value={stats.salesLast3Months} />
                     </View>
                 </ScrollView>
             )}
@@ -94,7 +112,7 @@ type IconName = React.ComponentProps<typeof Ionicons>["name"];
 function StatCard({ C, icon, label, value }: { C: ThemeColors; icon: IconName; label: string; value: string | number }) {
     return (
         <View style={[statStyles.card, { backgroundColor: C.surface }]}>
-            <Ionicons name={icon} size={20} color="#E8622A" />
+            <Ionicons name={icon} size={20} color={C.accentText} />
             <Text style={[statStyles.value, { color: C.text }]}>{value}</Text>
             <Text style={[statStyles.label, { color: C.textSecondary }]}>{label}</Text>
         </View>
@@ -126,6 +144,7 @@ const styles = StyleSheet.create({
     body: { paddingHorizontal: 16, gap: 16 },
     flyer: { width: "100%", aspectRatio: 16 / 9, borderRadius: 14 },
     title: { fontSize: 20, fontWeight: "700" },
+    sectionTitle: { fontSize: 15, fontWeight: "700", marginTop: 4 },
     statsGrid: {
         flexDirection: "row",
         flexWrap: "wrap",

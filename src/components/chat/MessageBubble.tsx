@@ -23,13 +23,13 @@ function formatFileSize(bytes?: number) {
 function FileBubble({ filename, size, isMine, C }: { filename?: string; size?: number; isMine: boolean; C: any }) {
     return (
         <View style={styles.fileBubble}>
-            <Ionicons name="document-text-outline" size={28} color={isMine ? "#fff" : C.accent} />
+            <Ionicons name="document-text-outline" size={28} color={isMine ? "#2A1A0F" : C.accent} />
             <View style={styles.fileInfo}>
                 <Text style={[isMine ? styles.textMine : styles.textOther, styles.fileName]} numberOfLines={1}>
                     {filename ?? "File"}
                 </Text>
                 {!!size && (
-                    <Text style={[styles.fileSize, { color: isMine ? "#DBEAFE" : C.textMuted }]}>
+                    <Text style={[styles.fileSize, { color: isMine ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)" }]}>
                         {formatFileSize(size)}
                     </Text>
                 )}
@@ -73,29 +73,29 @@ function PollBubble({
                         key={opt.id}
                         style={[
                             styles.pollOption,
-                            { borderColor: picked ? C.accent : (isMine ? "rgba(255,255,255,0.4)" : C.border) },
+                            { borderColor: picked ? C.accent : (isMine ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.25)") },
                         ]}
                         onPress={() => toggleOption(opt.id)}
                     >
                         <View style={[
                             styles.pollBar,
-                            { width: `${pct}%`, backgroundColor: isMine ? "rgba(255,255,255,0.25)" : C.accent + "33" },
+                            { width: `${pct}%`, backgroundColor: isMine ? "rgba(0,0,0,0.1)" : C.accent + "33" },
                         ]} />
                         <Ionicons
                             name={picked ? "checkmark-circle" : "ellipse-outline"}
                             size={16}
-                            color={picked ? C.accent : (isMine ? "#fff" : C.textMuted)}
+                            color={picked ? C.accent : (isMine ? "#2A1A0F" : "rgba(255,255,255,0.6)")}
                         />
                         <Text style={[styles.pollOptionText, isMine ? styles.textMine : styles.textOther]}>
                             {opt.text}
                         </Text>
-                        <Text style={[styles.pollOptionPct, { color: isMine ? "#DBEAFE" : C.textMuted }]}>
+                        <Text style={[styles.pollOptionPct, { color: isMine ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)" }]}>
                             {count > 0 ? `${pct}%` : ""}
                         </Text>
                     </TouchableOpacity>
                 );
             })}
-            <Text style={[styles.pollVoters, { color: isMine ? "#DBEAFE" : C.textMuted }]}>
+            <Text style={[styles.pollVoters, { color: isMine ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)" }]}>
                 {totalVoters} vote{totalVoters === 1 ? "" : "s"}
             </Text>
         </View>
@@ -124,7 +124,7 @@ function AudioBubble({ uri, isMine }: { uri: string; isMine: boolean }) {
     };
     return (
         <TouchableOpacity onPress={toggle} style={styles.audioBubble}>
-            <Text style={[styles.audioIcon, isMine && { color: "#fff" }]}>{playing ? "⏸" : "▶"}</Text>
+            <Text style={[styles.audioIcon, isMine && { color: "#2A1A0F" }]}>{playing ? "⏸" : "▶"}</Text>
             <View style={[styles.audioWave, isMine ? styles.audioWaveMine : styles.audioWaveOther]} />
         </TouchableOpacity>
     );
@@ -145,11 +145,14 @@ function MentionText({ content, isMine, accent }: { content: string; isMine: boo
 }
 
 // ─── Reply preview inside bubble ─────────────────────────────────────────────
-function ReplyPreview({ reply, C }: { reply: NonNullable<Message["replyTo"]>; C: any }) {
+function ReplyPreview({ reply, isMine, C }: { reply: NonNullable<Message["replyTo"]>; isMine: boolean; C: any }) {
     return (
-        <View style={[styles.replyPreview, { backgroundColor: C.background, borderLeftColor: C.accent }]}>
+        <View style={[
+            styles.replyPreview,
+            { backgroundColor: isMine ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.1)", borderLeftColor: C.accent },
+        ]}>
             <Text style={[styles.replySender, { color: C.accent }]}>{reply.senderName}</Text>
-            <Text style={[styles.replyContent, { color: C.textSecondary }]} numberOfLines={1}>
+            <Text style={[styles.replyContent, { color: isMine ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.7)" }]} numberOfLines={1}>
                 {reply.content}
             </Text>
         </View>
@@ -262,16 +265,16 @@ export function MessageBubble({
                 )}
                 <View style={[
                     styles.bubble,
-                    isMine ? styles.bubbleMine : [styles.bubbleOther, { backgroundColor: C.surface }],
+                    isMine ? styles.bubbleMine : styles.bubbleOther,
                     starred && styles.bubbleStarred,
                 ]}>
                     {!isMine && <Text style={styles.senderName}>{message.senderName}</Text>}
                     {isPinned && <Text style={styles.pinned}>📌 Pinned</Text>}
 
-                    {message.replyTo && <ReplyPreview reply={message.replyTo} C={C} />}
+                    {message.replyTo && <ReplyPreview reply={message.replyTo} isMine={isMine} C={C} />}
 
                     {deleted ? (
-                        <Text style={[styles.deleted, { color: C.textMuted }]}>This message was deleted</Text>
+                        <Text style={[styles.deleted, { color: isMine ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.6)" }]}>This message was deleted</Text>
                     ) : type === "text" ? (
                         <MentionText content={message.content} isMine={isMine} accent={C.accent} />
                     ) : type === "image" || type === "gif" ? (
@@ -299,7 +302,7 @@ export function MessageBubble({
 
                     <View style={styles.meta}>
                         {starred && <Text style={styles.starIcon}>⭐</Text>}
-                        <Text style={[styles.time, isMine ? styles.timeMine : { color: C.textMuted }]}>
+                        <Text style={[styles.time, isMine ? styles.timeMine : styles.timeOther]}>
                             {message.time}
                         </Text>
                         {isMine && status && (
@@ -334,18 +337,18 @@ const styles = StyleSheet.create({
     rowMine:       { justifyContent: "flex-end" },
     rowOther:      { justifyContent: "flex-start" },
     bubble:        { maxWidth: "75%", borderRadius: 16, padding: 10 },
-    bubbleMine:    { backgroundColor: "#299FFF", borderBottomRightRadius: 4 },
-    bubbleOther:   { borderBottomLeftRadius: 4 },
+    bubbleMine:    { backgroundColor: "rgba(255,235,215,0.95)", borderBottomRightRadius: 4 },
+    bubbleOther:   { backgroundColor: "rgba(0,0,0,0.32)", borderBottomLeftRadius: 4 },
     bubbleStarred: { borderWidth: 1, borderColor: "#FBBF24" },
-    senderName:    { fontSize: 12, fontWeight: "600", color: "#94A3B8", marginBottom: 4 },
+    senderName:    { fontSize: 12, fontWeight: "600", color: "rgba(255,255,255,0.6)", marginBottom: 4 },
     pinned:        { fontSize: 11, color: "#FCD34D", marginBottom: 4 },
     // reply preview
     replyPreview:  { borderLeftWidth: 3, borderRadius: 6, padding: 6, marginBottom: 6 },
     replySender:   { fontSize: 11, fontWeight: "700", marginBottom: 2 },
     replyContent:  { fontSize: 12 },
     // text
-    textMine:      { color: "white", fontSize: 15 },
-    textOther:     { fontSize: 15 },
+    textMine:      { color: "#2A1A0F", fontSize: 15 },
+    textOther:     { color: "#fff", fontSize: 15 },
     mention:       { fontWeight: "700" },
     deleted:       { fontStyle: "italic", fontSize: 14 },
     // media
@@ -356,8 +359,8 @@ const styles = StyleSheet.create({
     audioBubble:   { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4, minWidth: 140 },
     audioIcon:     { fontSize: 20, color: "#94A3B8" },
     audioWave:     { flex: 1, height: 3, borderRadius: 2 },
-    audioWaveMine: { backgroundColor: "rgba(255,255,255,0.5)" },
-    audioWaveOther:{ backgroundColor: "#475569" },
+    audioWaveMine: { backgroundColor: "rgba(0,0,0,0.3)" },
+    audioWaveOther:{ backgroundColor: "rgba(255,255,255,0.4)" },
     // file
     fileBubble:    { flexDirection: "row", alignItems: "center", gap: 10, minWidth: 160, maxWidth: 220 },
     fileInfo:      { flex: 1 },
@@ -381,8 +384,9 @@ const styles = StyleSheet.create({
     meta:          { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", marginTop: 4, gap: 4 },
     starIcon:      { fontSize: 10 },
     time:          { fontSize: 10 },
-    timeMine:      { color: "#DBEAFE" },
-    status:        { fontSize: 10, color: "#94A3B8" },
+    timeMine:      { color: "rgba(0,0,0,0.5)" },
+    timeOther:     { color: "rgba(255,255,255,0.55)" },
+    status:        { fontSize: 10, color: "rgba(0,0,0,0.5)" },
     statusRead:    { color: "#60A5FA" },
     system:        { alignSelf: "center", fontSize: 12, marginVertical: 8, fontStyle: "italic" },
     // action menu

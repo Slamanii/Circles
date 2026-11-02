@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Colors } from "../shared/theme";
 
 export default function ExportSecretModal({
     visible,
@@ -98,10 +99,10 @@ const styles = StyleSheet.create({
     },
     copyText: { color: "#fff", fontWeight: "600", fontSize: 14 },
     doneBtn: {
-        backgroundColor: "#E8622A",
+        backgroundColor: Colors.accent,
         borderRadius: 12,
         paddingVertical: 14,
         alignItems: "center",
     },
-    doneText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+    doneText: { color: Colors.black, fontWeight: "700", fontSize: 15 },
 });

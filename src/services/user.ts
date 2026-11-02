@@ -30,6 +30,13 @@ export async function searchUsers(query: string) {
     return api.get<UserSummary[]>(`/api/search-users?q=${encodeURIComponent(query)}`, "Search failed");
 }
 
+export type TopCreator = UserSummary & { eventCount: number };
+
+export async function fetchTopCreators(type: "artist" | "host", limit?: number) {
+    const q = limit ? `&limit=${limit}` : "";
+    return api.get<TopCreator[]>(`/api/top-creators?type=${type}${q}`, "Failed to fetch top creators");
+}
+
 export async function getUser() {
     return api.get<UserProfile>("/api/get-user", "Failed to fetch user");
 }

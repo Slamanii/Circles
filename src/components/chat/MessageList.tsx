@@ -1,7 +1,5 @@
 import { FlatList, Text, View } from "react-native"
 import { MessageBubble } from "./MessageBubble"
-import { useAppTheme } from "../../context/ThemeContext"
-import { getColors } from "../../shared/theme"
 
 type Props = {
     messages: any[];
@@ -22,8 +20,6 @@ export function MessageList({
     messages, onDelete, onShare, onPin, onReply, onStar, onSelect, onVotePoll, currentUserId,
     selectionMode, selectedIds, onToggleSelect,
 }: Props) {
-    const C = getColors(useAppTheme().theme);
-
     const renderItem = ({ item, index }: any) => {
         const prev = messages[index - 1];
         const showDate = !prev || prev.date !== item.date;
@@ -31,8 +27,8 @@ export function MessageList({
         return (
             <View>
                 {showDate && (
-                    <Text style={{ alignSelf: "center", marginVertical: 10, color: C.textSecondary }}>
-                        {item.date}
+                    <Text style={{ alignSelf: "center", marginVertical: 10, color: "rgba(255,255,255,0.6)", fontSize: 12 }}>
+                        {new Date(item.date).toLocaleDateString([], { month: "short", day: "numeric" })}
                     </Text>
                 )}
                 <MessageBubble

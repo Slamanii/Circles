@@ -34,7 +34,7 @@ const SURFACE = "#3A3939";
 const BORDER  = "#4A4949";
 const TEXT    = "#FFFFFF";
 const MUTED   = "#9CA3AF";
-const ACCENT  = "#E8622A";
+const ACCENT  = "#D7F23A";
 
 const CURRENCIES: Currency[] = ["USD", "NGN"];
 

@@ -12,7 +12,8 @@ import {
     View,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { deleteStory, deleteSubStory, fetchStoryById, fetchStoryLikes, fetchStoryViews, likeStory, unlikeStory } from "../../services/story";
+import { deleteStory, deleteSubStory, fetchComments, fetchStoryById, fetchStoryLikes, fetchStoryViews, likeStory, unlikeStory } from "../../services/story";
+import StoryCommentsModal from "./StoryCommentsModal";
 import { unfollowUser } from "../../services/user";
 import { AppNotification } from "../../services/notifications";
 import { getSocket } from "../../services/socket";
@@ -54,6 +55,8 @@ export default function StoryScreen({ route }: any) {
     const [liked, setLiked] = useState(false);
     const [viewers, setViewers] = useState<RawStoryView[]>([]);
     const [likers, setLikers] = useState<RawStoryLike[]>([]);
+    const [commentCount, setCommentCount] = useState(0);
+    const [commentsVisible, setCommentsVisible] = useState(false);
 
     const progress = useRef(new Animated.Value(0)).current;
     const animRef  = useRef<Animated.CompositeAnimation | null>(null);
@@ -72,16 +75,24 @@ export default function StoryScreen({ route }: any) {
     const { currentSubStory, next, prev, currentIndex, total } = useStoryLogic(story, subId);
     const isOwner = !!story && !!currentUserId && story.userId === currentUserId;
 
-    // Fetch likes (all viewers, to init the heart state) and views (owner-only) per sub-story
+    // Likes and comments are scoped to the whole story, not any one segment —
+    // fetched once per story rather than re-fetched on every sub-story change.
     useEffect(() => {
-        if (!currentSubStory) return;
-        fetchStoryLikes(currentSubStory.subId)
+        if (!story) return;
+        fetchStoryLikes(story.storyId)
             .then((data) => {
                 setLikers(data ?? []);
                 setLiked((data ?? []).some((l) => l.user_id === currentUserId));
             })
             .catch(console.error);
+        fetchComments(story.storyId)
+            .then((data) => setCommentCount((data ?? []).length))
+            .catch(() => setCommentCount(0));
+    }, [story?.storyId, currentUserId]);
 
+    // Views stay per sub-story segment — each segment is legitimately watched separately.
+    useEffect(() => {
+        if (!currentSubStory) return;
         if (isOwner) {
             fetchStoryViews(currentSubStory.subId)
                 .then((data) => setViewers(data ?? []))
@@ -89,22 +100,22 @@ export default function StoryScreen({ route }: any) {
         } else {
             setViewers([]);
         }
-    }, [currentSubStory?.subId, currentUserId, isOwner]);
+    }, [currentSubStory?.subId, isOwner]);
 
     // Live-update the like count while the owner is watching their own story,
     // instead of only reflecting likes gathered at the initial fetch above.
     useEffect(() => {
-        if (!isOwner || !currentSubStory) return;
-        const subId = currentSubStory.subId;
+        if (!isOwner || !story) return;
+        const storyId = story.storyId;
         const s = getSocket();
         const handler = (n: AppNotification) => {
-            if (n.type === "story_liked" && (n.reference_id === subId || n.metadata?.subId === subId)) {
-                fetchStoryLikes(subId).then((data) => setLikers(data ?? [])).catch(console.error);
+            if (n.type === "story_liked" && (n.reference_id === storyId || n.metadata?.storyId === storyId)) {
+                fetchStoryLikes(storyId).then((data) => setLikers(data ?? [])).catch(console.error);
             }
         };
         s?.on("notification", handler);
         return () => { s?.off("notification", handler); };
-    }, [isOwner, currentSubStory?.subId]);
+    }, [isOwner, story?.storyId]);
 
     // Restart progress bar whenever sub-story changes
     useEffect(() => {
@@ -142,7 +153,7 @@ export default function StoryScreen({ route }: any) {
     };
 
     const handleLike = async () => {
-        if (!currentSubStory) return;
+        if (!story) return;
         const nextLiked = !liked;
         setLiked(nextLiked);
         setLikers((prev) =>
@@ -152,11 +163,35 @@ export default function StoryScreen({ route }: any) {
         );
         try {
             if (nextLiked) {
-                await likeStory({ storyItemId: currentSubStory.subId });
+                await likeStory({ storyId: story.storyId });
             } else {
-                await unlikeStory({ storyItemId: currentSubStory.subId });
+                await unlikeStory({ storyId: story.storyId });
             }
         } catch { /* optimistic update already applied */ }
+    };
+
+    const openComments = () => {
+        pauseProgress();
+        setCommentsVisible(true);
+    };
+
+    const closeComments = () => {
+        setCommentsVisible(false);
+        resumeProgress();
+        if (story) {
+            fetchComments(story.storyId)
+                .then((data) => setCommentCount((data ?? []).length))
+                .catch(() => {});
+        }
+    };
+
+    const handleShare = async () => {
+        if (!story) return;
+        try {
+            await Share.share({ message: `Check out ${story.userName}'s story on Fuego` });
+        } catch (err) {
+            console.error("Share failed", err);
+        }
     };
 
     const handleOpenMenu = () => {
@@ -267,14 +302,31 @@ export default function StoryScreen({ route }: any) {
                 </View>
             ) : null}
 
-            {/* Like button */}
-            <TouchableOpacity style={styles.likeBtn} onPress={handleLike}>
-                <Ionicons
-                    name={liked ? "heart" : "heart-outline"}
-                    size={28}
-                    color={liked ? "#EF4444" : "#fff"}
-                />
-            </TouchableOpacity>
+            {/* Like / comment / share rail */}
+            <View style={styles.actionRail}>
+                <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
+                    <Ionicons
+                        name={liked ? "heart" : "heart-outline"}
+                        size={28}
+                        color={liked ? "#EF4444" : "#fff"}
+                    />
+                    {likers.length > 0 && <Text style={styles.actionCount}>{likers.length}</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={openComments}>
+                    <Ionicons name="chatbubble-outline" size={25} color="#fff" />
+                    {commentCount > 0 && <Text style={styles.actionCount}>{commentCount}</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn} onPress={handleShare}>
+                    <Ionicons name="paper-plane-outline" size={25} color="#fff" />
+                </TouchableOpacity>
+            </View>
+
+            <StoryCommentsModal
+                visible={commentsVisible}
+                onClose={closeComments}
+                storyId={story.storyId}
+                currentUserId={currentUserId}
+            />
 
             {/* Views/likes stats — owner only */}
             {isOwner && (
@@ -342,7 +394,9 @@ const styles = StyleSheet.create({
         right: 72,
     },
     caption: { color: "#fff", fontSize: 15, fontWeight: "500", textShadowColor: "rgba(0,0,0,0.6)", textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
-    likeBtn: { position: "absolute", bottom: 72, right: 20 },
+    actionRail: { position: "absolute", bottom: 72, right: 20, alignItems: "center", gap: 18 },
+    actionBtn: { alignItems: "center", gap: 2 },
+    actionCount: { color: "#fff", fontSize: 11, fontWeight: "600" },
     statsRow: { position: "absolute", bottom: 76, left: 20, flexDirection: "row", gap: 14 },
     statItem: { flexDirection: "row", alignItems: "center", gap: 4 },
     statText: { color: "#fff", fontSize: 13, fontWeight: "600" },

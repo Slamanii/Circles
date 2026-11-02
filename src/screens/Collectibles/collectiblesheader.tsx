@@ -17,13 +17,21 @@ export default function CollectiblesHeader({ query, setQuery }: Props) {
         <View style={[styles.container, { backgroundColor: C.headerBg }]}>
             <View style={styles.titleRow}>
                 <Text style={[styles.title, { color: C.text }]}>Your Collectibles</Text>
-                {/* "+" creates a new event so tickets can be minted from it */}
-                <TouchableOpacity
-                    onPress={() => navigation.navigate("CreateEvent")}
-                    style={styles.addBtn}
-                >
-                    <Ionicons name="add" size={24} color={C.text} />
-                </TouchableOpacity>
+                <View style={styles.headerActions}>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate("ScanEvents")}
+                        style={styles.addBtn}
+                    >
+                        <Ionicons name="qr-code-outline" size={22} color={C.text} />
+                    </TouchableOpacity>
+                    {/* "+" creates a new event so tickets can be minted from it */}
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate("CreateEvent")}
+                        style={styles.addBtn}
+                    >
+                        <Ionicons name="add" size={24} color={C.text} />
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <View style={[styles.searchWrap, { backgroundColor: C.surface, borderColor: C.border }]}>
@@ -62,6 +70,11 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: "700",
         color: Colors.text,
+    },
+    headerActions: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
     },
     addBtn: {
         padding: 4,

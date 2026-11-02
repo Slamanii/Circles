@@ -15,13 +15,17 @@ export type Collectible = {
         title: string;
         event_date: string;
         venue: string;
-        flyer_card: string | null;
+        flyer_card: string[] | null;
+        status: "active" | "expired" | "cancelled";
+        cancellation_notice: string | null;
     } | null;
     tier: {
         name: string;
         price: number;
         info: string | null;
         sort_order: number;
+        group_ticket: number | null;
+        free: boolean;
     } | null;
 };
 
@@ -49,6 +53,10 @@ export async function getTicketProof(assetId: string) {
 
 export async function transferTicket(assetId: string, recipientUserId: string): Promise<{ txSignature: string }> {
     return api.post("/api/transfer-ticket", { assetId, recipientUserId }, "Transfer failed");
+}
+
+export async function validateTicket(eventId: string, assetId: string): Promise<{ success: boolean; tierName: string | null; groupSize: number | null }> {
+    return api.post("/api/validate-ticket", { eventId, assetId }, "Failed to validate ticket");
 }
 
 /**

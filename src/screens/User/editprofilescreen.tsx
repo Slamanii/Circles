@@ -15,7 +15,7 @@ import {
     View,
 } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
-import { getColors } from "../../shared/theme";
+import { Colors, getColors } from "../../shared/theme";
 import { getUser, updateProfile } from "../../services/user";
 import { uploadMedia } from "../../services/upload";
 
@@ -116,8 +116,8 @@ export default function EditProfileScreen() {
                 <Text style={[styles.title, { color: C.text }]}>Edit Profile</Text>
                 <TouchableOpacity onPress={handleSave} disabled={saving}>
                     {saving
-                        ? <ActivityIndicator color="#E8622A" />
-                        : <Text style={styles.saveBtn}>Save</Text>
+                        ? <ActivityIndicator color={C.accentText} />
+                        : <Text style={[styles.saveBtn, { color: C.accentText }]}>Save</Text>
                     }
                 </TouchableOpacity>
             </View>
@@ -132,7 +132,7 @@ export default function EditProfileScreen() {
                     </View>
                 )}
                 <View style={styles.avatarBadge}>
-                    <Ionicons name="camera" size={14} color="#fff" />
+                    <Ionicons name="camera" size={14} color={Colors.black} />
                 </View>
             </TouchableOpacity>
 
@@ -146,7 +146,7 @@ export default function EditProfileScreen() {
                         <View style={styles.fieldWrap}>
                             <Text style={[styles.fieldLabel, { color: C.textSecondary }]}>Location</Text>
                             <View style={styles.locationValue}>
-                                <Ionicons name="location-outline" size={14} color="#E8622A" />
+                                <Ionicons name="location-outline" size={14} color={C.accentText} />
                                 <Text style={[styles.fieldInput, { color: location ? C.text : C.textMuted, flex: 1 }]} numberOfLines={1}>
                                     {location || "Add city"}
                                 </Text>
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     title: { fontSize: 17, fontWeight: "700" },
-    saveBtn: { color: "#E8622A", fontSize: 16, fontWeight: "700" },
+    saveBtn: { fontSize: 16, fontWeight: "700" },
     avatarWrap: {
         alignSelf: "center",
         marginBottom: 28,
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
         width: 28,
         height: 28,
         borderRadius: 14,
-        backgroundColor: "#E8622A",
+        backgroundColor: Colors.accent,
         alignItems: "center",
         justifyContent: "center",
     },

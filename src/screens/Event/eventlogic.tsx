@@ -10,7 +10,7 @@ import { ActiveWallet, CUSTODIAL, getActiveWallet } from "../../hooks/useWalletC
 import { LikeEvent, PreSave } from "../../services/eventService";
 import { makeCustodialSigner } from "../../services/wallet/custodialSign";
 import { sendSol, sendSplToken } from "../../services/wallet/send";
-import { confirmWalletPurchase, getPaymentOptions, initiatePaystackPay } from "../../services/walletService";
+import { claimFreeTicket, confirmWalletPurchase, getPaymentOptions, initiatePaystackPay } from "../../services/walletService";
 
 const TREASURY = process.env.EXPO_PUBLIC_TREASURY_ADDRESS!;
 
@@ -73,6 +73,21 @@ export function useEventLogic() {
 
     const handleGetTicket = (eventId: string) => {
         navigation.navigate("checkout", { eventId });
+    };
+
+    const [freeClaimLoading, setFreeClaimLoading] = useState(false);
+
+    const handleFreeClaim = async (eventId: string, tierId: string, quantity: number) => {
+        setFreeClaimLoading(true);
+        try {
+            const result = await claimFreeTicket(eventId, tierId, quantity);
+            const claimed = result.ticketsClaimed;
+            Alert.alert("Success", `${claimed} free ticket${claimed > 1 ? "s" : ""} claimed!`);
+        } catch (err) {
+            Alert.alert("Couldn't claim ticket", err instanceof Error ? err.message : "Please try again");
+        } finally {
+            setFreeClaimLoading(false);
+        }
     };
 
     const handlePaystackPayment = async (eventId: string, tierId: string, quantity: number) => {
@@ -179,6 +194,8 @@ export function useEventLogic() {
         handleLike,
         handlePreSave,
         handleGetTicket,
+        handleFreeClaim,
+        freeClaimLoading,
         handlePaystackPayment,
         handleWalletPayment,
         canPayWithWallet: canPay,

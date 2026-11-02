@@ -86,6 +86,38 @@ export async function searchUsers(query: string) {
     return data
 }
 
+// "Top artists" / "top promoters" (promoters map to the existing `host`
+// account_type — there's no separate enum value for it). Ranked by each
+// creator's current active-event count, counted client-side to match how
+// fetchEvents already computes per-tier remaining counts, rather than a
+// server-side GROUP BY.
+export async function fetchTopCreators(accountType: "artist" | "host", limit: number = 10) {
+    const { data: creators, error } = await supabase
+        .from("users")
+        .select("id, username, display_name, avatar")
+        .eq("account_type", accountType);
+
+    if (error) throw error;
+    if (!creators?.length) return [];
+
+    const creatorIds = creators.map(c => c.id);
+    const { data: events } = await supabase
+        .from("events")
+        .select("creator_id")
+        .eq("status", "active")
+        .in("creator_id", creatorIds);
+
+    const eventCountByCreator = new Map<string, number>();
+    for (const e of events ?? []) {
+        eventCountByCreator.set(e.creator_id, (eventCountByCreator.get(e.creator_id) ?? 0) + 1);
+    }
+
+    return creators
+        .map(c => ({ ...c, eventCount: eventCountByCreator.get(c.id) ?? 0 }))
+        .sort((a, b) => b.eventCount - a.eventCount)
+        .slice(0, limit);
+}
+
 async function markFollowedByViewer(rows: any[], idKey: "follower_id" | "following_id", viewerId: string) {
     const ids = rows.map((r) => r[idKey]).filter(Boolean);
     if (ids.length === 0) return rows;
@@ -233,7 +265,8 @@ export async function fetchLikedEvents(userId: string) {
         title,
         flyer_card,
         venue,
-        event_date
+        event_date,
+        creator_id
       )
     `)
     .eq("user_id", userId)

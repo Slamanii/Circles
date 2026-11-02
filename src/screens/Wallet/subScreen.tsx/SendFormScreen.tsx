@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { WalletTokenRow } from "../../../components/wallet/WalletTokenRow";
 import { Token } from "../../../../shared/Types";
+import { Colors } from "../../../shared/theme";
 
 export default function SendFormScreen({ navigation, route }: any) {
     const token: Token = route.params?.token;
@@ -130,16 +131,16 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 16,
-        backgroundColor: "#E8622A22",
+        backgroundColor: Colors.accentText + "22",
     },
-    maxText:      { color: "#E8622A", fontWeight: "700", fontSize: 12 },
+    maxText:      { color: Colors.accentText, fontWeight: "700", fontSize: 12 },
     balanceHint:  { color: "#6B7280", fontSize: 12, marginTop: -14, marginBottom: 28 },
     continueBtn: {
-        backgroundColor: "#E8622A",
+        backgroundColor: Colors.accent,
         borderRadius: 14,
         paddingVertical: 16,
         alignItems: "center",
     },
     disabled:     { opacity: 0.4 },
-    continueText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+    continueText: { color: Colors.black, fontWeight: "700", fontSize: 16 },
 });

@@ -11,6 +11,21 @@ const BUBBLEGUM_PROGRAM_ID: Pubkey = anchor_lang::solana_program::pubkey!("BGUMA
 const SPL_NOOP_ID: Pubkey = anchor_lang::solana_program::pubkey!("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
 const SPL_COMPRESSION_ID: Pubkey = anchor_lang::solana_program::pubkey!("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
 
+// Solana caps each PDA seed at 32 bytes — a UUID's string form (36 bytes,
+// dashes included) exceeds that. Its raw 16-byte form (32 hex digits once
+// dashes are stripped) does not, and is still fully deterministic and
+// collision-free per event_id. The client must derive PDAs the same way.
+fn uuid_seed(event_id: &str) -> [u8; 16] {
+    let hex: Vec<u8> = event_id.bytes().filter(|b| *b != b'-').collect();
+    let mut bytes = [0u8; 16];
+    for i in 0..16 {
+        let hi = (hex[i * 2] as char).to_digit(16).unwrap_or(0) as u8;
+        let lo = (hex[i * 2 + 1] as char).to_digit(16).unwrap_or(0) as u8;
+        bytes[i] = (hi << 4) | lo;
+    }
+    bytes
+}
+
 pub const EVENT_SIZE: usize = 8   // discriminator
     + 8                           // max_supply
     + 8                           // minted
@@ -199,7 +214,7 @@ pub struct CreateEvent<'info> {
         init,
         payer = authority,
         space = EVENT_SIZE,
-        seeds = [b"event", event_id.as_bytes()],
+        seeds = [b"event", &uuid_seed(&event_id)[..]],
         bump
     )]
     pub event: Account<'info, Event>,

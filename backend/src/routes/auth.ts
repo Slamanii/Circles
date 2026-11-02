@@ -1,20 +1,36 @@
-import { loginOrSignup, resetPassword, savePushToken, getNonce, deleteAccount, exportWalletSecret, linkWallet, listLinkedWallets, reauth, StepUpPurpose, STEP_UP_PURPOSES } from "../mod/auth";
+import { loginOrSignup, requestPasswordReset, resetPassword, savePushToken, getNonce, deleteAccount, exportWalletSecret, linkWallet, listLinkedWallets, reauth, StepUpPurpose, STEP_UP_PURPOSES } from "../mod/auth";
 import { AuthRequest } from "../mod/auth";
 import { Response, Request } from "express";
 
 export async function loginOrSignupRouter(req: Request, res: Response) {
     try {
-        const { email, password } = req.body as { email: string; password: string };
+        const { email, password, accountType } = req.body as { email: string; password: string; accountType?: string };
 
         if (!email || !password) {
             return res.status(400).json({ error: "Email and password required" });
         }
 
-        const result = await loginOrSignup(email, password);
+        const result = await loginOrSignup(email, password, accountType);
         res.status(200).json(result);
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to login";
         res.status(401).json({ error: message });
+    }
+}
+
+export async function requestPasswordResetRouter(req: Request, res: Response) {
+    try {
+        const { email } = req.body as { email: string };
+        if (!email) {
+            return res.status(400).json({ error: "email required" });
+        }
+        await requestPasswordReset(email);
+        res.json({ success: true });
+    } catch (error) {
+        // Still respond success-shaped on failure so this endpoint never
+        // leaks account existence or internal error detail to the caller.
+        console.error("[requestPasswordReset] failed:", error);
+        res.json({ success: true });
     }
 }
 

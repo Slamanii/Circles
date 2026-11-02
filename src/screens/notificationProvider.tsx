@@ -83,12 +83,17 @@ export default function NotificationListener({ userId }: { userId: string }) {
                     break;
                 case "event_liked":
                 case "event_mint_complete":
-                case "event_mint_failed": {
+                case "event_mint_failed":
+                case "event_updated":
+                case "event_cancelled": {
                     const eventId = d.eventId ?? d.reference_id;
-                    if (eventId) navigationRef.navigate("EventDetails", { eventId });
+                    if (eventId) navigationRef.navigate("checkout", { eventId });
                     break;
                 }
                 case "story_liked":
+                case "story_commented":
+                case "story_comment_reply":
+                case "story_comment_liked":
                     if (d.storyId) navigationRef.navigate("StoryDetail", { storyId: d.storyId, subId: d.subId });
                     break;
                 case "collectible_received":

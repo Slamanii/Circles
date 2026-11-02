@@ -1,5 +1,9 @@
-import { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image } from "expo-image";
+import { Video, ResizeMode } from "expo-av";
+import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import PaymentTerminal from "../../components/EventPurchaseTerminal";
 import { TokenPicker } from "../../components/TokenPicker";
 import EventCard from "../../components/EventCard";
@@ -8,6 +12,7 @@ import TierTabSwitcher from "../../components/TierTabSwitcher";
 import { TicketTier } from "../../hooks/useEvents";
 import EventHeader from "./eventheader";
 import { useEventLogic } from "./eventlogic";
+import { getEventById } from "../../services/eventService";
 import { useAppTheme } from "../../context/ThemeContext";
 import { getColors } from "../../shared/theme";
 
@@ -40,6 +45,99 @@ function useCountdown(eventDate: string | null) {
     return timeLeft;
 }
 
+function GuestListDropdown({ guestList, C }: { guestList: string | null; C: any }) {
+    const [open, setOpen] = useState(false);
+    const names = (guestList ?? "").split("\n").map(n => n.trim()).filter(Boolean);
+    if (!names.length) return null;
+
+    return (
+        <View style={[styles.guestCard, { backgroundColor: C.card }]}>
+            <TouchableOpacity style={styles.guestHeader} onPress={() => setOpen(o => !o)} activeOpacity={0.7}>
+                <Text style={[styles.guestTitle, { color: C.text }]}>Guest List ({names.length})</Text>
+                <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={C.textSecondary} />
+            </TouchableOpacity>
+            {open && (
+                <View style={styles.guestList}>
+                    {names.map((name, i) => (
+                        <View key={i} style={[styles.guestPill, { backgroundColor: C.accentText + "18" }]}>
+                            <Text style={[styles.guestPillText, { color: C.accentText }]}>{name}</Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+        </View>
+    );
+}
+
+type PersonChip = { id: string; username: string; avatar: string | null };
+
+// GitHub-achievement-badge layout: tightly packed, overlapping circular
+// avatars — creator first, then collaborators. Only the creator's name is
+// captioned below; collaborators are decorative, avatar-only. Tapping any
+// avatar (creator or collaborator) opens that person's profile.
+function HostAndCollaboratorsRow({
+    creator,
+    collaborators,
+    C,
+}: {
+    creator: PersonChip | null;
+    collaborators: PersonChip[];
+    C: any;
+}) {
+    const navigation = useNavigation<any>();
+    if (!creator) return null;
+
+    const people = [creator, ...collaborators];
+
+    return (
+        <View style={styles.collabSection}>
+            <View style={styles.avatarStack}>
+                {people.map((p, i) => (
+                    <TouchableOpacity
+                        key={p.id}
+                        style={[styles.avatarWrap, { marginLeft: i === 0 ? 0 : -12, zIndex: people.length - i }]}
+                        onPress={() => navigation.navigate("UserProfile", { followingId: p.id })}
+                    >
+                        {p.avatar ? (
+                            <Image source={{ uri: p.avatar }} style={[styles.avatar, { borderColor: C.background }]} />
+                        ) : (
+                            <View style={[styles.avatar, { backgroundColor: C.surface, borderColor: C.background }]} />
+                        )}
+                    </TouchableOpacity>
+                ))}
+            </View>
+            <Text style={[styles.hostName, { color: C.textSecondary }]}>{creator.username}</Text>
+        </View>
+    );
+}
+
+const SCREEN_WIDTH = Dimensions.get("window").width;
+
+function VideoPage({ videoUrl, playing, onTogglePlay, videoRef }: {
+    videoUrl: string;
+    playing: boolean;
+    onTogglePlay: () => void;
+    videoRef: React.RefObject<Video | null>;
+}) {
+    return (
+        <View style={styles.videoPage}>
+            <Video
+                ref={videoRef}
+                source={{ uri: videoUrl }}
+                style={StyleSheet.absoluteFill}
+                resizeMode={ResizeMode.CONTAIN}
+                isLooping
+                onPlaybackStatusUpdate={(status) => {
+                    if (status.isLoaded && status.didJustFinish) onTogglePlay();
+                }}
+            />
+            <TouchableOpacity style={styles.videoPlayBtn} onPress={onTogglePlay}>
+                <Ionicons name={playing ? "pause" : "play"} size={30} color="#fff" />
+            </TouchableOpacity>
+        </View>
+    );
+}
+
 function CountdownUnit({ value, label, C }: { value: number; label: string; C: any }) {
     return (
         <View style={styles.unit}>
@@ -52,9 +150,29 @@ function CountdownUnit({ value, label, C }: { value: number; label: string; C: a
 }
 
 export default function EventPurchaseScreen({ route }: any) {
-    const { eventId } = route.params;
+    const { eventId, inviteToken } = route.params;
     const C = getColors(useAppTheme().theme);
     const [activeTierName, setActiveTierName] = useState("Base");
+
+    const outerScrollRef = useRef<ScrollView>(null);
+    const videoRef = useRef<Video>(null);
+    const [videoPlaying, setVideoPlaying] = useState(false);
+
+    const goToVideoPage = () => {
+        outerScrollRef.current?.scrollTo({ x: SCREEN_WIDTH, animated: true });
+        videoRef.current?.playAsync();
+        setVideoPlaying(true);
+    };
+
+    const toggleVideoPlay = () => {
+        if (videoPlaying) {
+            videoRef.current?.pauseAsync();
+            setVideoPlaying(false);
+        } else {
+            videoRef.current?.playAsync();
+            setVideoPlaying(true);
+        }
+    };
 
     const {
         events,
@@ -65,6 +183,7 @@ export default function EventPurchaseScreen({ route }: any) {
         handleLike,
         handlePreSave,
 
+        handleFreeClaim,
         handlePaystackPayment,
         handleWalletPayment,
         pickerVisible,
@@ -75,28 +194,61 @@ export default function EventPurchaseScreen({ route }: any) {
         promptProps,
     } = useEventLogic();
 
+    // Private events are excluded from the bulk list, so a direct invite-link
+    // open won't find them there — fetch this one event directly instead.
+    const [privateEvent, setPrivateEvent] = useState<any>(null);
+    const [privateEventError, setPrivateEventError] = useState<string | null>(null);
+    useEffect(() => {
+        if (loading || events.some(e => e.id === eventId)) return;
+        getEventById(eventId, inviteToken)
+            .then(setPrivateEvent)
+            .catch(err => setPrivateEventError(err instanceof Error ? err.message : "Event not found"));
+    }, [loading, events, eventId, inviteToken]);
+
     if (loading) return <ActivityIndicator style={{ flex: 1 }} />;
     if (error) return <Text style={{ color: "red", margin: 20 }}>{error}</Text>;
 
-    const event = events.find(e => e.id === eventId);
-    if (!event) return <Text style={{ margin: 20, color: C.text }}>Event not found</Text>;
+    const event = events.find(e => e.id === eventId) ?? privateEvent;
+    if (!event) {
+        return (
+            <Text style={{ margin: 20, color: C.text }}>
+                {privateEventError ?? "Event not found"}
+            </Text>
+        );
+    }
 
-    const activeTier = (event.ticket_tiers ?? []).find(t => t.name === activeTierName);
-    const purchaseDisabled = !activeTier || activeTier.remaining <= 0;
+    const activeTier = (event.ticket_tiers ?? []).find((t: TicketTier) => t.name === activeTierName);
+    const isCancelled = event.status === "cancelled";
+    const purchaseDisabled = !activeTier || activeTier.remaining <= 0 || isCancelled;
 
-    return (
-        <>
+    const pageContent = (
             <ScrollView style={[styles.container, { backgroundColor: C.background }]}>
                 <EventHeader showBack />
 
-                <EventCard
-                    event={event}
-                    liked={likedIds.has(event.id)}
-                    saved={savedIds.has(event.id)}
-                    onLike={() => handleLike(event.id)}
-                    onPreSave={() => handlePreSave(event.id)}
-                    onGetTicket={() => {}}
-                />
+                <View>
+                    <EventCard
+                        event={event}
+                        liked={likedIds.has(event.id)}
+                        saved={savedIds.has(event.id)}
+                        onLike={() => handleLike(event.id)}
+                        onPreSave={() => handlePreSave(event.id)}
+                        onGetTicket={() => {}}
+                    />
+                    {!!event.video_url && (
+                        <TouchableOpacity style={styles.playShortcut} onPress={goToVideoPage}>
+                            <Ionicons name="play" size={18} color="#fff" />
+                        </TouchableOpacity>
+                    )}
+                </View>
+
+                {isCancelled && (
+                    <View style={styles.cancelledBanner}>
+                        <Text style={styles.cancelledTitle}>This event was cancelled</Text>
+                        {!!event.cancellation_notice && (
+                            <Text style={styles.cancelledNotice}>{event.cancellation_notice}</Text>
+                        )}
+                    </View>
+                )}
 
                 <TierTabSwitcher
                     tiers={event.ticket_tiers ?? []}
@@ -107,16 +259,45 @@ export default function EventPurchaseScreen({ route }: any) {
 
                 <Countdown eventDate={event.event_date ?? null} />
 
-                <View style={styles.paymentSection}>
-                    <Text style={[styles.paymentTitle, { color: C.text }]}>Choose Payment Method</Text>
-                    <PaymentTerminal
-                        tierId={activeTier?.id ?? null}
-                        disabled={purchaseDisabled}
-                        onPaystack={(tierId: string, qty: number) => handlePaystackPayment(event.id, tierId, qty)}
-                        onWallet={(tierId: string, qty: number) => handleWalletPayment(event.id, tierId, qty)}
-                    />
-                </View>
+                <HostAndCollaboratorsRow creator={event.creator ?? null} collaborators={event.collaborators ?? []} C={C} />
+
+                <GuestListDropdown guestList={event.guest_list ?? null} C={C} />
+
+                {!isCancelled && (
+                    <View style={styles.paymentSection}>
+                        <Text style={[styles.paymentTitle, { color: C.text }]}>Choose Payment Method</Text>
+                        <PaymentTerminal
+                            tierId={activeTier?.id ?? null}
+                            isFree={!!activeTier?.free}
+                            disabled={purchaseDisabled}
+                            onFreeClaim={(tierId: string, qty: number) => handleFreeClaim(event.id, tierId, qty)}
+                            onPaystack={(tierId: string, qty: number) => handlePaystackPayment(event.id, tierId, qty)}
+                            onWallet={(tierId: string, qty: number) => handleWalletPayment(event.id, tierId, qty)}
+                        />
+                    </View>
+                )}
             </ScrollView>
+    );
+
+    return (
+        <>
+            {event.video_url ? (
+                <ScrollView
+                    ref={outerScrollRef}
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    style={{ flex: 1 }}
+                >
+                    <View style={{ width: SCREEN_WIDTH, flex: 1 }}>{pageContent}</View>
+                    <VideoPage
+                        videoUrl={event.video_url}
+                        playing={videoPlaying}
+                        onTogglePlay={toggleVideoPlay}
+                        videoRef={videoRef}
+                    />
+                </ScrollView>
+            ) : pageContent}
 
             <TokenPicker
                 visible={pickerVisible}
@@ -148,8 +329,15 @@ function TierPanel({ tier, tierName, C }: { tier: TicketTier | undefined; tierNa
         <View style={[styles.tierPanel, { backgroundColor: C.card }]}>
             <View style={styles.tierPanelHeader}>
                 <Text style={[styles.tierPanelName, { color: C.text }]}>{tier.name}</Text>
-                <Text style={[styles.tierPanelPrice, { color: C.text }]}>₦{tier.price.toLocaleString()}</Text>
+                <Text style={[styles.tierPanelPrice, { color: C.text }]}>
+                    {tier.free ? "Free" : `₦${tier.price.toLocaleString()}`}
+                </Text>
             </View>
+            {!!tier.group_ticket && (
+                <Text style={[styles.tierPanelInfo, { color: C.textSecondary }]}>
+                    Admits {tier.group_ticket} people per ticket
+                </Text>
+            )}
             {!!tier.info && (
                 <Text style={[styles.tierPanelInfo, { color: C.textSecondary }]}>{tier.info}</Text>
             )}
@@ -186,6 +374,32 @@ function Countdown({ eventDate }: { eventDate: string | null }) {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
+    videoPage: {
+        width: SCREEN_WIDTH,
+        flex: 1,
+        backgroundColor: "#000",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    videoPlayBtn: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: "rgba(255,255,255,0.2)",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    playShortcut: {
+        position: "absolute",
+        bottom: 16,
+        right: 16,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: "rgba(0,0,0,0.55)",
+        alignItems: "center",
+        justifyContent: "center",
+    },
     countdownCard: {
         marginHorizontal: 16,
         marginVertical: 12,
@@ -197,6 +411,82 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.08,
         shadowRadius: 12,
         elevation: 4,
+    },
+    cancelledBanner: {
+        marginHorizontal: 16,
+        marginTop: 12,
+        borderRadius: 14,
+        padding: 14,
+        backgroundColor: "#D6454520",
+        borderLeftWidth: 3,
+        borderLeftColor: "#D64545",
+    },
+    cancelledTitle: {
+        color: "#D64545",
+        fontWeight: "700",
+        fontSize: 14,
+        marginBottom: 4,
+    },
+    cancelledNotice: {
+        color: "#D64545",
+        fontSize: 13,
+        lineHeight: 18,
+    },
+    collabSection: {
+        marginHorizontal: 16,
+        marginTop: 4,
+        marginBottom: 12,
+        alignItems: "flex-start",
+        gap: 6,
+    },
+    avatarStack: {
+        flexDirection: "row",
+        alignItems: "center",
+    },
+    avatarWrap: {
+        borderRadius: 20,
+    },
+    avatar: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        borderWidth: 2,
+    },
+    hostName: {
+        fontSize: 13,
+        fontWeight: "600",
+    },
+    guestCard: {
+        marginHorizontal: 16,
+        marginBottom: 12,
+        borderRadius: 16,
+        overflow: "hidden",
+    },
+    guestHeader: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+    },
+    guestTitle: {
+        fontSize: 14,
+        fontWeight: "700",
+    },
+    guestList: {
+        paddingHorizontal: 16,
+        paddingBottom: 14,
+        gap: 8,
+    },
+    guestPill: {
+        alignSelf: "flex-start",
+        borderRadius: 20,
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+    },
+    guestPillText: {
+        fontSize: 13,
+        fontWeight: "600",
     },
     countdownHeading: {
         fontSize: 12,

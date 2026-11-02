@@ -1,4 +1,4 @@
-import { NormalizedStory, RawStory, RawStoryLike, RawStoryView } from "../../shared/Types";
+import { NormalizedStory, RawStory, RawStoryLike, RawStoryView, StoryComment } from "../../shared/Types";
 import { api } from "./apiClient";
 
 function normalizeStory(raw: RawStory | null | undefined): NormalizedStory | null | undefined {
@@ -40,7 +40,7 @@ export async function viewStory(storyData: { storyItemId: string }) {
     }
 }
 
-export async function unlikeStory(storyData: { storyItemId: string }) {
+export async function unlikeStory(storyData: { storyId: string }) {
     try {
         return await api.post("/api/unlike-story", storyData, "Failed to unlike story");
     } catch (err) {
@@ -49,7 +49,7 @@ export async function unlikeStory(storyData: { storyItemId: string }) {
     }
 }
 
-export async function likeStory(storyData: { storyItemId: string }) {
+export async function likeStory(storyData: { storyId: string }) {
     try {
         return await api.post("/api/like-story", storyData, "Failed to like story");
     } catch (err) {
@@ -148,11 +148,56 @@ export async function fetchStoryViews(subStoryId: string) {
     }
 }
 
-export async function fetchStoryLikes(subStoryId: string) {
+export async function fetchStoryLikes(storyId: string) {
     try {
-        return await api.post<RawStoryLike[]>("/api/fetch-storylikes", { subStoryId }, "Failed to fetch story likes");
+        return await api.post<RawStoryLike[]>("/api/fetch-storylikes", { storyId }, "Failed to fetch story likes");
     } catch (err) {
         console.error("fetchStoryLikes error:", err);
+        throw err;
+    }
+}
+
+export async function addComment(storyId: string, content: string, parentCommentId?: string) {
+    try {
+        return await api.post<StoryComment>("/api/add-comment", { storyId, content, parentCommentId }, "Failed to add comment");
+    } catch (err) {
+        console.error("addComment error:", err);
+        throw err;
+    }
+}
+
+export async function deleteComment(commentId: string) {
+    try {
+        return await api.post("/api/delete-comment", { commentId }, "Failed to delete comment");
+    } catch (err) {
+        console.error("deleteComment error:", err);
+        throw err;
+    }
+}
+
+export async function fetchComments(storyId: string) {
+    try {
+        return await api.get<StoryComment[]>(`/api/fetch-comments?storyId=${encodeURIComponent(storyId)}`, "Failed to fetch comments");
+    } catch (err) {
+        console.error("fetchComments error:", err);
+        throw err;
+    }
+}
+
+export async function likeComment(commentId: string) {
+    try {
+        return await api.post("/api/like-comment", { commentId }, "Failed to like comment");
+    } catch (err) {
+        console.error("likeComment error:", err);
+        throw err;
+    }
+}
+
+export async function unlikeComment(commentId: string) {
+    try {
+        return await api.post("/api/unlike-comment", { commentId }, "Failed to unlike comment");
+    } catch (err) {
+        console.error("unlikeComment error:", err);
         throw err;
     }
 }

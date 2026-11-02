@@ -41,6 +41,7 @@ export default function UserScreen({ route }: any) {
         followers,
         following,
         profileUserId,
+        currentUserId,
         followed,
         isOwnProfile,
         isPrivate,
@@ -65,12 +66,20 @@ export default function UserScreen({ route }: any) {
         navigation.navigate("FollowList", { userId: profileUserId, mode, username });
     };
 
+    const handleEventPress = (ev: RawEventSummary) => {
+        if (ev.creator_id && ev.creator_id === currentUserId) {
+            navigation.navigate("EventInfo", { eventId: ev.id, flyerCard: ev.flyer_card?.[0] });
+        } else {
+            navigation.navigate("checkout", { eventId: ev.id });
+        }
+    };
+
     const hasMore = bio || link1 || link2;
 
     return (
         <View style={[styles.container, { backgroundColor: C.background }]}>
             <LinearGradient
-                colors={["rgba(232,98,42,0.18)", "rgba(232,98,42,0.06)", "transparent"]}
+                colors={["rgba(45,27,69,0.3)", "rgba(232,90,160,0.1)", "transparent"]}
                 locations={[0, 0.45, 1]}
                 style={styles.headerGradient}
                 pointerEvents="none"
@@ -100,14 +109,27 @@ export default function UserScreen({ route }: any) {
                 {/* Profile block */}
                 <View style={styles.profileBlock}>
                     <View style={styles.profileRow}>
-                        {/* Avatar */}
-                        {avatar ? (
-                            <Image source={{ uri: avatar }} style={styles.avatar} />
-                        ) : (
-                            <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: C.surface }]}>
-                                <Ionicons name="person" size={32} color={C.textSecondary} />
-                            </View>
-                        )}
+                        {/* Avatar — tap opens their stories, or just the photo if they have none */}
+                        <TouchableOpacity
+                            activeOpacity={avatar ? 0.8 : 1}
+                            disabled={!avatar}
+                            onPress={() => {
+                                if (userStories.length > 0) {
+                                    navigation.navigate("StoryDetail", { storyId: userStories[0].storyId, subId: undefined });
+                                } else if (avatar) {
+                                    navigation.navigate("MediaViewer", { uri: avatar, type: "image" });
+                                }
+                            }}
+                            style={userStories.length > 0 && styles.avatarRing}
+                        >
+                            {avatar ? (
+                                <Image source={{ uri: avatar }} style={styles.avatar} />
+                            ) : (
+                                <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: C.surface }]}>
+                                    <Ionicons name="person" size={32} color={C.textSecondary} />
+                                </View>
+                            )}
+                        </TouchableOpacity>
 
                         {/* Name + stats */}
                         <View style={styles.profileInfo}>
@@ -119,7 +141,7 @@ export default function UserScreen({ route }: any) {
                                 {hasMore && (
                                     <TouchableOpacity onPress={() => setShowMore(v => !v)}>
                                         <LinearGradient
-                                            colors={["#E8622A", "#C94E1F"]}
+                                            colors={["#2D1B45", "#E85AA0"]}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 1, y: 0 }}
                                             style={styles.moreBtn}
@@ -170,8 +192,8 @@ export default function UserScreen({ route }: any) {
                                     style={styles.linkRow}
                                     onPress={() => Linking.openURL(link1.startsWith("http") ? link1 : `https://${link1}`)}
                                 >
-                                    <Ionicons name="link-outline" size={14} color="#E8622A" />
-                                    <Text style={styles.linkText} numberOfLines={1}>{link1}</Text>
+                                    <Ionicons name="link-outline" size={14} color={C.accentText} />
+                                    <Text style={[styles.linkText, { color: C.accentText }]} numberOfLines={1}>{link1}</Text>
                                 </TouchableOpacity>
                             ) : null}
                             {link2 ? (
@@ -179,8 +201,8 @@ export default function UserScreen({ route }: any) {
                                     style={styles.linkRow}
                                     onPress={() => Linking.openURL(link2.startsWith("http") ? link2 : `https://${link2}`)}
                                 >
-                                    <Ionicons name="link-outline" size={14} color="#E8622A" />
-                                    <Text style={styles.linkText} numberOfLines={1}>{link2}</Text>
+                                    <Ionicons name="link-outline" size={14} color={C.accentText} />
+                                    <Text style={[styles.linkText, { color: C.accentText }]} numberOfLines={1}>{link2}</Text>
                                 </TouchableOpacity>
                             ) : null}
                         </View>
@@ -251,7 +273,7 @@ export default function UserScreen({ route }: any) {
                                                     key={ev.id}
                                                     event={ev}
                                                     C={C}
-                                                    onPress={isOwnProfile ? () => navigation.navigate("EventInfo", { eventId: ev.id, flyerCard: ev.flyer_card }) : undefined}
+                                                    onPress={() => handleEventPress(ev)}
                                                 />
                                             ))}
                                             {hostedVisible < hostedEvents.length && (
@@ -268,7 +290,7 @@ export default function UserScreen({ route }: any) {
                                     ) : (
                                         <>
                                             {likedEvents.slice(0, likedVisible).map((ev) => (
-                                                <EventRow key={ev.id} event={ev} C={C} />
+                                                <EventRow key={ev.id} event={ev} C={C} onPress={() => handleEventPress(ev)} />
                                             ))}
                                             {likedVisible < likedEvents.length && (
                                                 <ShowMore onPress={showMoreLiked} C={C} />
@@ -300,8 +322,8 @@ function EventRow({ event, C, onPress }: { event: RawEventSummary; C: ThemeColor
     const Wrapper = onPress ? TouchableOpacity : View;
     return (
         <Wrapper style={styles.eventRow} onPress={onPress} activeOpacity={onPress ? 0.7 : undefined}>
-            {event.flyer_card ? (
-                <Image source={{ uri: event.flyer_card }} style={styles.thumb} />
+            {event.flyer_card?.[0] ? (
+                <Image source={{ uri: event.flyer_card[0] }} style={styles.thumb} />
             ) : (
                 <View style={[styles.thumb, { backgroundColor: C.surface, borderRadius: 8 }]} />
             )}
@@ -331,7 +353,7 @@ function TabSwitcher({ active, onChange }: { active: Tab; onChange: (t: Tab) => 
             <View style={tabStyles.labelRow}>
                 <TouchableOpacity style={tabStyles.tab} onPress={() => onChange("events")} activeOpacity={0.7}>
                     <LinearGradient
-                        colors={["#E8622A", "#C94E1F"]}
+                        colors={["#2D1B45", "#E85AA0"]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={tabStyles.gradientText}
@@ -341,7 +363,7 @@ function TabSwitcher({ active, onChange }: { active: Tab; onChange: (t: Tab) => 
                 </TouchableOpacity>
                 <TouchableOpacity style={tabStyles.tab} onPress={() => onChange("stories")} activeOpacity={0.7}>
                     <LinearGradient
-                        colors={["#E8622A", "#C94E1F"]}
+                        colors={["#2D1B45", "#E85AA0"]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={tabStyles.gradientText}
@@ -353,7 +375,7 @@ function TabSwitcher({ active, onChange }: { active: Tab; onChange: (t: Tab) => 
             <View style={tabStyles.lineRow}>
                 {active === "events" ? (
                     <LinearGradient
-                        colors={["#E8622A", "#C94E1F"]}
+                        colors={["#2D1B45", "#E85AA0"]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={tabStyles.lineHalf}
@@ -363,7 +385,7 @@ function TabSwitcher({ active, onChange }: { active: Tab; onChange: (t: Tab) => 
                 )}
                 {active === "stories" ? (
                     <LinearGradient
-                        colors={["#E8622A", "#C94E1F"]}
+                        colors={["#2D1B45", "#E85AA0"]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 0 }}
                         style={tabStyles.lineHalf}
@@ -464,7 +486,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
     },
     walletBtnText: {
-        color: "#fff",
+        color: Colors.black,
         fontSize: 13,
         fontWeight: "700",
     },
@@ -480,6 +502,12 @@ const styles = StyleSheet.create({
     },
     avatar: { width: 92, height: 92, borderRadius: 46 },
     avatarFallback: { alignItems: "center", justifyContent: "center" },
+    avatarRing: {
+        borderWidth: 2,
+        borderColor: Colors.accentText,
+        borderRadius: 49,
+        padding: 3,
+    },
     profileInfo: { flex: 1, gap: 5 },
     nameRow: {
         flexDirection: "row",
@@ -506,7 +534,7 @@ const styles = StyleSheet.create({
     moreSection: { marginTop: 14, gap: 8 },
     bio: { fontSize: 14, lineHeight: 20 },
     linkRow: { flexDirection: "row", alignItems: "center", gap: 5 },
-    linkText: { fontSize: 13, color: "#E8622A", flex: 1 },
+    linkText: { fontSize: 13, flex: 1 },
     actions: {
         flexDirection: "row",
         alignItems: "center",

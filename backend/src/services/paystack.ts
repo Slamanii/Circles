@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { Request } from "express";
 import { supabase } from "./supabase";
 import { notifyUser } from "./realtime";
+import { assertEventNotCancelled } from "../mod/events";
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY!;
 const MAX_TICKETS_PER_USER = 5;
@@ -21,6 +22,7 @@ export async function initiatePaystackPay({
     if (!Number.isFinite(quantity) || quantity < 1 || quantity > MAX_TICKETS_PER_USER) {
         throw new Error(`Quantity must be between 1 and ${MAX_TICKETS_PER_USER}`);
     }
+    await assertEventNotCancelled(eventId);
 
     // Check how many tickets this user already owns for this event
     const { count: owned } = await supabase
@@ -124,7 +126,7 @@ export async function paystackWebhook(req: Request & { rawBody?: Buffer }) {
     // Claim all reserved tickets — idempotent if webhook fires twice
     const { data: claimed } = await supabase
         .from("collectibles")
-        .update({ owner_id: user_id, custodian: "user", status: "active" })
+        .update({ owner_id: user_id, custodian: "user", status: "active", sold_at: new Date().toISOString() })
         .in("id", mint_ids)
         .eq("status", "reserved")
         .select("asset_id");

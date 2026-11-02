@@ -61,7 +61,7 @@ function NotifItem({ item, C }: NotifItemProps) {
             { backgroundColor: item.is_read ? C.background : C.accentLight },
         ]}>
             <View style={[styles.iconWrap, { backgroundColor: C.surface }]}>
-                <Ionicons name={typeIcon(item.type)} size={20} color={Colors.accent} />
+                <Ionicons name={typeIcon(item.type)} size={20} color={C.accentText} />
             </View>
             <View style={styles.textWrap}>
                 <View style={styles.titleRow}>
@@ -140,7 +140,7 @@ export default function NotificationsScreen() {
 
             {loading ? (
                 <View style={styles.center}>
-                    <ActivityIndicator color={Colors.accent} />
+                    <ActivityIndicator color={C.accentText} />
                 </View>
             ) : error ? (
                 <View style={styles.center}>
@@ -156,8 +156,8 @@ export default function NotificationsScreen() {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            tintColor={Colors.accent}
-                            colors={[Colors.accent]}
+                            tintColor={C.accentText}
+                            colors={[C.accentText]}
                         />
                     }
                     renderItem={({ item }) => <NotifItem item={item} C={C} />}

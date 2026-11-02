@@ -4,7 +4,7 @@ import { useNavigation } from "@react-navigation/native";
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Switch, Text, TouchableOpacity, View, ScrollView } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
-import { getColors } from "../../shared/theme";
+import { Colors, getColors } from "../../shared/theme";
 import { updateProfile } from "../../services/user";
 import { deleteAccount } from "../../services/login";
 import { deleteToken } from "../../services/secureStorage";
@@ -123,7 +123,7 @@ export default function SettingsScreen() {
                             <Switch
                                 value={isPrivate}
                                 onValueChange={togglePrivate}
-                                trackColor={{ true: "#E8622A" }}
+                                trackColor={{ true: Colors.accent }}
                             />
                         }
                     />
@@ -134,7 +134,7 @@ export default function SettingsScreen() {
                             <Switch
                                 value={theme === "dark"}
                                 onValueChange={toggleTheme}
-                                trackColor={{ true: "#E8622A" }}
+                                trackColor={{ true: Colors.accent }}
                             />
                         }
                     />

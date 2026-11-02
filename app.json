@@ -48,7 +48,16 @@
       ],
       "expo-secure-store",
       "@react-native-community/datetimepicker",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-font",
+      "expo-router",
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Linked uses your camera to scan ticket QR codes at the door."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

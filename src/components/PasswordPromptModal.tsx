@@ -8,6 +8,7 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { Colors } from "../shared/theme";
 
 export default function PasswordPromptModal({
     visible,
@@ -65,7 +66,7 @@ export default function PasswordPromptModal({
                             disabled={loading || !password}
                         >
                             {loading
-                                ? <ActivityIndicator color="#fff" />
+                                ? <ActivityIndicator color={Colors.black} />
                                 : <Text style={styles.confirmText}>Confirm</Text>
                             }
                         </TouchableOpacity>
@@ -116,8 +117,8 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         borderRadius: 12,
         alignItems: "center",
-        backgroundColor: "#E8622A",
+        backgroundColor: Colors.accent,
     },
     disabled:    { opacity: 0.4 },
-    confirmText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+    confirmText: { color: Colors.black, fontWeight: "700", fontSize: 15 },
 });

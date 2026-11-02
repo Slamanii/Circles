@@ -23,6 +23,14 @@ export async function confirmWalletPurchase(
     );
 }
 
+export async function claimFreeTicket(eventId: string, tierId: string, quantity: number) {
+    return api.post<{ success: boolean; ticketsClaimed: number }>(
+        "/api/claim-free-ticket",
+        { eventId, tierId, quantity },
+        "Failed to claim free ticket",
+    );
+}
+
 export async function initiatePaystackPay(eventId: string, tierId: string, quantity: number) {
     try {
         return await api.post<{ checkoutUrl: string; reference: string; quantity: number }>(

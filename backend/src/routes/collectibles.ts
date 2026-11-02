@@ -1,6 +1,6 @@
 import { initiatePaystackPay, paystackWebhook } from "../services/paystack";
-import { getPaymentOptions, confirmWalletPurchase } from "../services/walletPay";
-import { fetchUserCollectibles, getCollectibleProof, getCollectibleById, transferTicketInApp } from "../mod/collectibles";
+import { getPaymentOptions, confirmWalletPurchase, claimFreeTicket } from "../services/walletPay";
+import { fetchUserCollectibles, getCollectibleProof, getCollectibleById, transferTicketInApp, validateTicket } from "../mod/collectibles";
 import { AuthRequest } from "../mod/auth"
 import { Response } from "express"
 
@@ -22,6 +22,18 @@ export async function confirmWalletPurchaseRouter(req: AuthRequest, res: Respons
         const userId = req.user!.id;
         const { eventId, tierId, txSignature, tokenMint } = req.body;
         const result = await confirmWalletPurchase({ userId, eventId, tierId, txSignature, tokenMint });
+        res.json(result);
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        res.status(500).json({ error: msg });
+    }
+}
+
+export async function claimFreeTicketRouter(req: AuthRequest, res: Response) {
+    try {
+        const userId = req.user!.id;
+        const { eventId, tierId, quantity } = req.body;
+        const result = await claimFreeTicket({ userId, eventId, tierId, quantity: Number(quantity) });
         res.json(result);
     } catch (err) {
         const msg = err instanceof Error ? err.message : "Unknown error";
@@ -120,6 +132,18 @@ export async function transferTicketRouter(req: AuthRequest, res: Response) {
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "Unknown error";
         res.status(500).json({ error: errorMessage });
+    }
+}
+
+export async function validateTicketRouter(req: AuthRequest, res: Response) {
+    try {
+        const scannerUserId = req.user!.id;
+        const { eventId, assetId } = req.body;
+        const result = await validateTicket(eventId, scannerUserId, assetId);
+        res.json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to validate ticket";
+        res.status(message === "You don't have scan access for this event" ? 403 : 500).json({ error: message });
     }
 }
 

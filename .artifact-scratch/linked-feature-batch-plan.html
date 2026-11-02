@@ -1,0 +1,519 @@
+<title>Linked Feature Batch</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: vertical build-order ledger — numbered status cards disclosing
+   their implementation detail, progress readable at a glance top to bottom. */
+:root {
+  --bg: #F1F2F4;
+  --surface: #FFFFFF;
+  --border: #D8DBDF;
+  --fg: #1A1D21;
+  --muted: #5B6168;
+  --accent: #E8622A;
+  --accent-soft: #E8622A1A;
+  --done: #2F8F5B;
+  --done-soft: #2F8F5B1A;
+  --pending: #9AA0A6;
+  --pending-soft: #9AA0A60F;
+  --optional: #B08900;
+  --optional-soft: #B089001A;
+  --mono-bg: #E9EBEE;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14161A;
+    --surface: #1C1F24;
+    --border: #2B2F36;
+    --fg: #E7E9EC;
+    --muted: #9099A3;
+    --accent: #F17A4A;
+    --accent-soft: #F17A4A26;
+    --done: #4CAF78;
+    --done-soft: #4CAF7826;
+    --pending: #6B7278;
+    --pending-soft: #6B727826;
+    --optional: #D6A531;
+    --optional-soft: #D6A53126;
+    --mono-bg: #23262C;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #14161A;
+  --surface: #1C1F24;
+  --border: #2B2F36;
+  --fg: #E7E9EC;
+  --muted: #9099A3;
+  --accent: #F17A4A;
+  --accent-soft: #F17A4A26;
+  --done: #4CAF78;
+  --done-soft: #4CAF7826;
+  --pending: #6B7278;
+  --pending-soft: #6B727826;
+  --optional: #D6A531;
+  --optional-soft: #D6A53126;
+  --mono-bg: #23262C;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 720px; margin: 0 auto; padding-block: 28px 64px; }
+a { color: var(--accent); }
+code, .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+code {
+  background: var(--mono-bg);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  font-size: 0.86em;
+  word-break: break-word;
+}
+
+header.top { margin-bottom: 28px; }
+h1 {
+  font-size: clamp(1.5rem, 5vw, 1.9rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+.subtitle { color: var(--muted); font-size: 0.95rem; line-height: 1.5; max-width: 60ch; margin: 0 0 20px; }
+
+.progress-row { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; flex-wrap: wrap; }
+.progress-label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; white-space: nowrap; }
+.progress-track {
+  flex: 1; min-width: 120px; height: 8px; border-radius: 99px;
+  background: var(--border); overflow: hidden;
+}
+.progress-fill { height: 100%; background: var(--accent); border-radius: 99px; }
+.progress-count { font-family: "IBM Plex Mono", monospace; font-size: 0.85rem; color: var(--fg); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.callout {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 18px 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+.callout .label { font-weight: 700; display: block; margin-bottom: 4px; }
+
+.callout.note { border-left: 3px solid var(--pending); }
+.callout.decision { border-left: 3px solid var(--accent); }
+
+h2.section {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+  margin: 36px 0 14px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+h2.section:first-of-type { border-top: none; padding-top: 0; margin-top: 28px; }
+
+.item {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 14px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.item summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.item summary::-webkit-details-marker { display: none; }
+.item summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+  min-width: 1.4em;
+  flex-shrink: 0;
+}
+.item-title { font-weight: 600; font-size: 0.97rem; flex: 1; min-width: 0; }
+.chev { color: var(--muted); flex-shrink: 0; transition: transform 0.15s ease; font-size: 0.8rem; }
+.item[open] .chev { transform: rotate(90deg); }
+
+.pill {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pill.done { color: var(--done); background: var(--done-soft); }
+.pill.pending { color: var(--pending); background: var(--pending-soft); }
+.pill.optional { color: var(--optional); background: var(--optional-soft); }
+
+.item-body {
+  padding: 0 16px 16px 16px;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--fg);
+}
+.item-body p { margin: 0 0 10px; }
+.item-body p:last-child { margin-bottom: 0; }
+.item-body ul { margin: 0 0 10px; padding-left: 1.2em; }
+.item-body li { margin-bottom: 6px; }
+.item-body li:last-child { margin-bottom: 0; }
+.drift {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+.drift .label { color: var(--accent); font-weight: 700; display: block; margin-bottom: 3px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.verify-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.verify-list li {
+  display: flex; align-items: flex-start; gap: 10px;
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; background: var(--surface);
+  font-size: 0.88rem; line-height: 1.55;
+}
+.verify-list input[type="checkbox"] { margin-top: 3px; accent-color: var(--accent); flex-shrink: 0; width: 16px; height: 16px; }
+.verify-list label { cursor: pointer; }
+.verify-list li.checked { opacity: 0.55; }
+.verify-list li.checked label { text-decoration: line-through; }
+
+footer.foot { margin-top: 36px; color: var(--muted); font-size: 0.8rem; text-align: center; }
+</style>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<div class="wrap">
+  <header class="top">
+    <h1>Linked feature batch</h1>
+    <p class="subtitle">
+      Account identity, event lifecycle and ticketing, QR check-in, and story comments —
+      twelve items, built one at a time, backend and UI only. None of them touch the
+      on-chain Anchor program.
+    </p>
+    <div class="progress-row">
+      <span class="progress-label">Progress</span>
+      <div class="progress-track"><div class="progress-fill" style="width:41.6%"></div></div>
+      <span class="progress-count">5 / 12 done</span>
+    </div>
+  </header>
+
+  <div class="callout note">
+    <span class="label">Already answered</span>
+    A chat "edit message" modal does not exist. <code>messages.edited_at</code> is a column
+    that was added but never wired to any UI — no edit-message component exists in
+    <code>src/components/chat</code> or <code>src/screens/Chat</code>.
+  </div>
+
+  <div class="callout decision">
+    <span class="label">Confirmed design decision</span>
+    A Group ticket is <strong>one ticket, N admissions</strong> — a single collectible
+    carries <code>group_ticket</code> (the head count), one QR scanned once admits
+    everyone. No on-chain change needed: <code>max_supply</code> already counts ticket
+    objects, not people.
+  </div>
+
+  <h2 class="section">Build order</h2>
+
+  <details class="item" open>
+    <summary>
+      <span class="num">01</span>
+      <span class="item-title">Account types</span>
+      <span class="pill done">Done</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        New <code>users.account_type</code> column — <code>user</code>, <code>artist</code>,
+        <code>host</code>, <code>vendor</code>, or <code>venue</code>, default <code>user</code>.
+        Picked at signup via a chip row on <code>CreateAccountScreen.tsx</code>, validated
+        and written server-side in <code>loginOrSignup</code>.
+      </p>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">02</span>
+      <span class="item-title">Event categories</span>
+      <span class="pill done">Done</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        <code>events.category</code> — <code>movie</code>, <code>professional</code>,
+        <code>concert</code>, <code>birthday</code>, <code>sports</code>,
+        <code>educational</code>, <code>private</code>, or <code>other</code>. Picking
+        <code>other</code> reveals a <code>custom_category</code> field, capped at one
+        word, 15 characters, enforced on both the client and in <code>createEvent</code>.
+      </p>
+      <ul>
+        <li>
+          <strong>Private events</strong> are excluded from every browse query
+          (<code>fetchEvents</code>'s <code>.neq("category", "private")</code>) and only
+          open via an <code>invite_token</code> passed as a query param to
+          <code>GET /api/event/:id</code>.
+        </li>
+        <li>
+          <strong>Movie events only</strong> may attach one <code>video_url</code> and
+          carry up to five images in <code>flyer_card</code>; every other category is
+          capped at one flyer image.
+        </li>
+      </ul>
+      <div class="drift">
+        <span class="label">Changed from the original plan</span>
+        Swapped <code>political</code> for <code>professional</code> and added
+        <code>sports</code> / <code>educational</code>. The movie-video field ended up
+        singular (<code>video_url</code>), and it's <code>flyer_card</code> that became
+        the array — carrying several images only for a movie event, not the video field.
+      </div>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">03</span>
+      <span class="item-title">Group &amp; Free ticket tiers</span>
+      <span class="pill done">Done</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        Two new tier types alongside Base / VIP / VIP++, each a plain
+        <code>ticket_tiers</code> row like the others:
+      </p>
+      <ul>
+        <li><strong>Group</strong> — <code>group_ticket</code> (an integer ≥ 2) records how many people one ticket admits.</li>
+        <li><strong>Free</strong> — <code>free = true</code> forces price to 0 and skips the payment terminal entirely; a new <code>POST /api/claim-free-ticket</code> reserves and immediately activates the collectible.</li>
+      </ul>
+      <p>
+        <code>TierTabSwitcher</code> always shows Base/VIP/VIP++ (dimmed if absent) but
+        only adds a Group or Free tab when the event actually has one.
+      </p>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">04</span>
+      <span class="item-title">Event Edit infrastructure</span>
+      <span class="pill done">Done</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        Nothing let a creator edit an event after creation. New
+        <code>PUT /api/event/:id</code> → <code>updateEvent()</code>, creator-only,
+        scoped to <code>event_date</code> and <code>venue</code> — tiers, price, and
+        supply stay fixed, since they're baked into the on-chain <code>max_supply</code>
+        and the already-minted collectible rows with no live recomputation path.
+      </p>
+      <p>
+        Every ticket holder with status <code>active</code> gets notified
+        (<code>event_updated</code>, a new notification type) whenever venue or date
+        changes. New <code>eventEditScreen.tsx</code>, reached from an Edit icon on the
+        creator-only stats screen.
+      </p>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">05</span>
+      <span class="item-title">Guest list</span>
+      <span class="pill done">Done</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        <code>events.guest_list</code> — free text, never on-chain, capped at 15 names.
+        Both the create sheet and the edit screen show fifteen fixed name fields rather
+        than one open text box.
+      </p>
+      <p>
+        On the event-details screen it renders as a closed "Guest List (N)" row; tapping
+        it reveals every name as a pill, stacked one per line.
+      </p>
+      <div class="drift">
+        <span class="label">Changed from the original plan</span>
+        Originally scoped as creator-only and hidden from the public page. It's now
+        shown on the event-details screen itself, and entry moved from one freeform
+        field to a fixed 15-slot form on both sheets.
+      </div>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">06</span>
+      <span class="item-title">Collaborators</span>
+      <span class="pill pending">Pending</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        New <code>event_collaborators</code> table, added by user id through the Edit
+        screen, purely decorative — no edit authority. Renders as avatar chips on the
+        event page, each linking to that person's profile. Reuses the existing
+        <code>GET /api/search-users</code> endpoint for lookup.
+      </p>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">07</span>
+      <span class="item-title">Cancel event</span>
+      <span class="pill pending">Pending</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        Uses the <code>cancelled</code> status already in the <code>events.status</code>
+        check constraint but never set by any code path. A new
+        <code>cancellation_notice</code> field holds the creator's compensation
+        disclosure. Purchases and scans get blocked; the ticket itself stays visible,
+        showing the notice — cancel, not delete.
+      </p>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">08</span>
+      <span class="item-title">QR-scan access grants + scan screen</span>
+      <span class="pill pending">Pending</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        <code>TicketQRScreen.tsx</code> already encodes an asset id with nothing on the
+        other end. New <code>event_scan_grants</code> table (creator-granted, per event),
+        a <code>POST /api/validate-ticket</code> endpoint, and a camera-based
+        <code>ScanTicketScreen.tsx</code> that shows "Group of N" when the scanned
+        ticket's tier calls for it.
+      </p>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">09</span>
+      <span class="item-title">Host footer on event &amp; ticket detail</span>
+      <span class="pill pending">Pending</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        Extend the event-detail and collectible queries to join the creator's avatar and
+        display name, and add a footer row linking to their profile on both screens.
+      </p>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">10</span>
+      <span class="item-title">Wallet chart library swap</span>
+      <span class="pill pending">Pending</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        Replace <code>react-native-chart-kit</code> with
+        <code>react-native-gifted-charts</code> in <code>Chart.tsx</code> — a pure
+        rendering swap, since <code>fetchChartData</code> already pulls real CoinGecko
+        price data.
+      </p>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">11</span>
+      <span class="item-title">Calendar view</span>
+      <span class="pill optional">Optional — cut first</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        A month grid marking days with events, tapping a day to list them. Nothing else
+        in this plan depends on it — the first thing to drop if time runs short.
+      </p>
+    </div>
+  </details>
+
+  <details class="item">
+    <summary>
+      <span class="num">12</span>
+      <span class="item-title">Story comments + share</span>
+      <span class="pill pending">Pending</span>
+      <span class="chev">▸</span>
+    </summary>
+    <div class="item-body">
+      <p>
+        No new chat message type, no 1:1 messaging — scrapped in favor of keeping story
+        interactions self-contained. Story likes already work; new
+        <code>story_comments</code> (with one level of replies) and
+        <code>story_comment_likes</code> tables add comments, opened from a count next to
+        the existing like button. Share opens the native OS share sheet — no backend
+        change needed.
+      </p>
+    </div>
+  </details>
+
+  <h2 class="section">Verification</h2>
+  <ul class="verify-list" id="verify">
+    <li data-k="v1"><input type="checkbox" id="v1"><label for="v1">Sign up as each account type; confirm it persists and shows wherever a profile is fetched.</label></li>
+    <li data-k="v2"><input type="checkbox" id="v2"><label for="v2">Create a public event and a private one; confirm the private one is absent from every list and opens only via its invite link.</label></li>
+    <li data-k="v3"><input type="checkbox" id="v3"><label for="v3">Buy a Group ticket (<code>group_ticket: 4</code>); confirm one collectible mints, and scanning shows "Group of 4".</label></li>
+    <li data-k="v4"><input type="checkbox" id="v4"><label for="v4">Add a collaborator and a guest-list entry via the Edit screen; confirm both persist with zero edit access for the collaborator.</label></li>
+    <li data-k="v5"><input type="checkbox" id="v5"><label for="v5">Grant a second user scan access; confirm they can validate a ticket and a non-granted user cannot.</label></li>
+    <li data-k="v6"><input type="checkbox" id="v6"><label for="v6">Cancel an event with a compensation notice; confirm purchases are blocked and the notice shows on already-owned tickets.</label></li>
+    <li data-k="v7"><input type="checkbox" id="v7"><label for="v7">Confirm the event and ticket host footers link to the correct creator profile.</label></li>
+    <li data-k="v8"><input type="checkbox" id="v8"><label for="v8">Swap the wallet chart library and confirm it still renders real price data.</label></li>
+    <li data-k="v9"><input type="checkbox" id="v9"><label for="v9">Comment on a story, reply to that comment, like the reply; confirm nesting, like counts, notifications, and the share sheet.</label></li>
+  </ul>
+
+  <footer class="foot">Linked · implementation plan · updated as items ship</footer>
+</div>
+
+<script>
+(function () {
+  try {
+    var KEY = "linked-plan-verify-v1";
+    var saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+  } catch (e) { var saved = {}; }
+  var boxes = document.querySelectorAll("#verify input[type=checkbox]");
+  boxes.forEach(function (box) {
+    var li = box.closest("li");
+    if (saved[box.id]) { box.checked = true; li.classList.add("checked"); }
+    box.addEventListener("change", function () {
+      li.classList.toggle("checked", box.checked);
+      try {
+        saved[box.id] = box.checked;
+        localStorage.setItem(KEY, JSON.stringify(saved));
+      } catch (e) {}
+    });
+  });
+})();
+</script>

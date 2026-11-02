@@ -91,7 +91,7 @@ function TopBar({ mode, fadeAnim, inputRef, query, setQuery, onEnterSearch, onEx
                         </TouchableOpacity>
                     )}
                     <TouchableOpacity onPress={onExitSearch} style={styles.cancelBtn}>
-                        <Text style={styles.cancelText}>Cancel</Text>
+                        <Text style={[styles.cancelText, { color: colors.accentText }]}>Cancel</Text>
                     </TouchableOpacity>
                 </Animated.View>
             )}
@@ -185,7 +185,7 @@ export default function StoriesSearchScreen() {
                     ListHeaderComponent={
                         <TouchableOpacity style={styles.storyItem} onPress={onUploadPress}>
                             <View style={styles.uploadCircle}>
-                                <Ionicons name="add" size={26} color={Colors.accent} />
+                                <Ionicons name="add" size={26} color={C.accentText} />
                             </View>
                             <Text style={styles.storyName}>Your story</Text>
                         </TouchableOpacity>
@@ -211,8 +211,8 @@ export default function StoriesSearchScreen() {
                         <RefreshControl
                             refreshing={refreshing}
                             onRefresh={onRefresh}
-                            tintColor={Colors.accent}
-                            colors={[Colors.accent]}
+                            tintColor={C.accentText}
+                            colors={[C.accentText]}
                         />
                     }
                     renderItem={({ item }) => (
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     },
     cancelText: {
         fontSize: 14,
-        color: Colors.accent,
+        color: Colors.accentText,
         fontWeight: "600",
     },
     // Stories
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
         height: 66,
         borderRadius: 33,
         borderWidth: 2,
-        borderColor: Colors.accent,
+        borderColor: Colors.accentText,
         borderStyle: "dashed",
         justifyContent: "center",
         alignItems: "center",

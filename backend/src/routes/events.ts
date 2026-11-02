@@ -1,4 +1,4 @@
-import { createEvent, fetchEvents, likeEvent, preSave, runMintJob, resumeStuckMints, expireStaleEvents, burnExpiredTickets, getEventById, getEventStats } from "../mod/events"
+import { createEvent, fetchEvents, likeEvent, preSave, runMintJob, resumeStuckMints, expireStaleEvents, burnExpiredTickets, getEventById, getEventStats, updateEvent, addCollaborator, removeCollaborator, cancelEvent, grantScanAccess, revokeScanAccess, fetchScanGrants, fetchScannableEvents } from "../mod/events"
 import { AuthRequest } from "../mod/auth"
 import { Request, Response } from "express"
 import { supabase } from "../services/supabase"
@@ -27,6 +27,105 @@ export async function createEventRouter(req: AuthRequest, res: Response) {
     } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to create event";
         console.error("createEvent error:", message);
+        res.status(500).json({ error: message });
+    }
+}
+
+export async function updateEventRouter(req: AuthRequest, res: Response) {
+    try {
+        const userId = req.user!.id;
+        const eventId = req.params.id as string;
+        const result = await updateEvent(eventId, userId, req.body);
+        res.json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to update event";
+        res.status(message === "Unauthorized" ? 403 : 500).json({ error: message });
+    }
+}
+
+export async function addCollaboratorRouter(req: AuthRequest, res: Response) {
+    try {
+        const creatorId = req.user!.id;
+        const eventId = req.params.id as string;
+        const { userId } = req.body;
+        const result = await addCollaborator(eventId, creatorId, userId);
+        res.json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to add collaborator";
+        res.status(message === "Unauthorized" ? 403 : 500).json({ error: message });
+    }
+}
+
+export async function removeCollaboratorRouter(req: AuthRequest, res: Response) {
+    try {
+        const creatorId = req.user!.id;
+        const eventId = req.params.id as string;
+        const { userId } = req.body;
+        const result = await removeCollaborator(eventId, creatorId, userId);
+        res.json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to remove collaborator";
+        res.status(message === "Unauthorized" ? 403 : 500).json({ error: message });
+    }
+}
+
+export async function cancelEventRouter(req: AuthRequest, res: Response) {
+    try {
+        const creatorId = req.user!.id;
+        const eventId = req.params.id as string;
+        const { notice } = req.body;
+        const result = await cancelEvent(eventId, creatorId, notice);
+        res.json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to cancel event";
+        res.status(message === "Unauthorized" ? 403 : 500).json({ error: message });
+    }
+}
+
+export async function grantScanAccessRouter(req: AuthRequest, res: Response) {
+    try {
+        const creatorId = req.user!.id;
+        const eventId = req.params.id as string;
+        const { userId } = req.body;
+        const result = await grantScanAccess(eventId, creatorId, userId);
+        res.json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to grant scan access";
+        res.status(message === "Unauthorized" ? 403 : 500).json({ error: message });
+    }
+}
+
+export async function revokeScanAccessRouter(req: AuthRequest, res: Response) {
+    try {
+        const creatorId = req.user!.id;
+        const eventId = req.params.id as string;
+        const { userId } = req.body;
+        const result = await revokeScanAccess(eventId, creatorId, userId);
+        res.json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to revoke scan access";
+        res.status(message === "Unauthorized" ? 403 : 500).json({ error: message });
+    }
+}
+
+export async function fetchScanGrantsRouter(req: AuthRequest, res: Response) {
+    try {
+        const eventId = req.params.id as string;
+        const result = await fetchScanGrants(eventId);
+        res.json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to fetch scan grants";
+        res.status(500).json({ error: message });
+    }
+}
+
+export async function fetchScannableEventsRouter(req: AuthRequest, res: Response) {
+    try {
+        const userId = req.user!.id;
+        const result = await fetchScannableEvents(userId);
+        res.json(result);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to fetch scannable events";
         res.status(500).json({ error: message });
     }
 }
@@ -152,10 +251,11 @@ export async function eventMetadataRouter(req: Request, res: Response) {
             name: event.title,
             symbol: "TKT",
             description: event.description ?? "",
-            image: event.flyer_card ?? "",
+            image: event.flyer_card?.[0] ?? "",
             attributes: [
                 { trait_type: "Venue", value: event.venue },
                 { trait_type: "Date", value: event.event_date },
+                { trait_type: "Category", value: event.custom_category ?? event.category },
             ],
         });
     } catch {
@@ -182,17 +282,29 @@ export async function ticketMetadataRouter(req: Request, res: Response) {
             name: tier ? `${tier.name} Ticket #${num}` : `Ticket #${num}`,
             symbol: "TKT",
             description: event.description ?? "",
-            image: event.flyer_card ?? "",
+            image: event.flyer_card?.[0] ?? "",
             attributes: [
                 { trait_type: "Serial", value: num },
                 { trait_type: "Venue", value: event.venue },
                 { trait_type: "Date", value: event.event_date },
+                { trait_type: "Category", value: event.custom_category ?? event.category },
                 ...(tier ? [{ trait_type: "Tier", value: tier.name }] : []),
                 ...(tier?.info ? [{ trait_type: "Tier Info", value: tier.info }] : []),
             ],
         });
     } catch {
         res.status(404).json({ error: "Event not found" });
+    }
+}
+
+export async function getEventByIdRouter(req: AuthRequest, res: Response) {
+    try {
+        const token = req.query.token as string | undefined;
+        const event = await getEventById(req.params.id as string, token);
+        res.json(event);
+    } catch (error) {
+        const message = error instanceof Error ? error.message : "Event not found";
+        res.status(404).json({ error: message });
     }
 }
 

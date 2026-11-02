@@ -62,10 +62,19 @@ function SeedPhraseModal({
     );
 }
 
+const ACCOUNT_TYPES = [
+    { key: "user",   label: "Fan" },
+    { key: "artist", label: "Artist" },
+    { key: "host",   label: "Host" },
+    { key: "vendor", label: "Vendor" },
+    { key: "venue",  label: "Venue" },
+] as const;
+
 export default function CreateAccountScreen({ onSuccess, onGoToSignIn }: Props) {
     const [email,    setEmail]    = useState("");
     const [password, setPassword] = useState("");
     const [confirm,  setConfirm]  = useState("");
+    const [accountType, setAccountType] = useState<string>("user");
     const [loading,  setLoading]  = useState(false);
 
     const [pendingMnemonic, setPendingMnemonic] = useState<string | null>(null);
@@ -86,7 +95,7 @@ export default function CreateAccountScreen({ onSuccess, onGoToSignIn }: Props) 
         }
         setLoading(true);
         try {
-            const data = await Login(email.trim(), password);
+            const data = await Login(email.trim(), password, accountType);
             if (!data?.user || !data?.token) {
                 Alert.alert("Sign up failed", "Something went wrong");
                 return;
@@ -152,6 +161,22 @@ export default function CreateAccountScreen({ onSuccess, onGoToSignIn }: Props) 
                         />
                     </View>
 
+                    <Text style={styles.accountTypeLabel}>I'm joining as</Text>
+                    <View style={styles.accountTypeRow}>
+                        {ACCOUNT_TYPES.map((t) => (
+                            <TouchableOpacity
+                                key={t.key}
+                                style={[styles.accountTypeChip, accountType === t.key && styles.accountTypeChipActive]}
+                                onPress={() => setAccountType(t.key)}
+                                activeOpacity={0.8}
+                            >
+                                <Text style={[styles.accountTypeChipText, accountType === t.key && styles.accountTypeChipTextActive]}>
+                                    {t.label}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
                     <TouchableOpacity
                         style={[styles.confirmBtn, (!email || !password || !confirm || loading) && styles.disabled]}
                         onPress={handleCreate}
@@ -195,7 +220,23 @@ const styles = StyleSheet.create({
     header:      { marginBottom: 36, gap: 6 },
     title:       { color: "#fff", fontSize: 32, fontWeight: "800", letterSpacing: -0.5 },
     sub:         { color: "#666", fontSize: 14 },
-    fields:      { gap: 12, marginBottom: 24 },
+    fields:      { gap: 12, marginBottom: 20 },
+    accountTypeLabel: { color: "#666", fontSize: 13, marginBottom: 10 },
+    accountTypeRow:   { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 24 },
+    accountTypeChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 20,
+        backgroundColor: "#1A1A1A",
+        borderWidth: 1,
+        borderColor: "#2A2A2A",
+    },
+    accountTypeChipActive: {
+        backgroundColor: Colors.accent,
+        borderColor: Colors.accent,
+    },
+    accountTypeChipText:       { color: "#999", fontSize: 13, fontWeight: "600" },
+    accountTypeChipTextActive: { color: Colors.black },
     input: {
         backgroundColor: "#1A1A1A",
         borderRadius: 12,
@@ -217,7 +258,7 @@ const styles = StyleSheet.create({
     confirmText: { color: "#000", fontWeight: "700", fontSize: 15, letterSpacing: 0.2 },
     switchRow:   { alignItems: "center", marginTop: 4 },
     switchText:  { color: "#666", fontSize: 14 },
-    switchLink:  { color: Colors.accent, fontWeight: "600" },
+    switchLink:  { color: Colors.accentText, fontWeight: "600" },
 });
 
 const seed = StyleSheet.create({
@@ -243,7 +284,7 @@ const seed = StyleSheet.create({
         borderRadius: 12,
         padding: 16,
         borderLeftWidth: 3,
-        borderLeftColor: Colors.accent,
+        borderLeftColor: Colors.accentText,
     },
     grid: {
         flexDirection: "row",
@@ -265,7 +306,7 @@ const seed = StyleSheet.create({
         borderColor: "#2A2A2A",
     },
     wordIndex: {
-        color: Colors.accent,
+        color: Colors.accentText,
         fontSize: 11,
         fontWeight: "700",
         width: 18,
@@ -282,5 +323,5 @@ const seed = StyleSheet.create({
         paddingVertical: 17,
         alignItems: "center",
     },
-    btnText: { color: "#fff", fontWeight: "700", fontSize: 15 },
+    btnText: { color: Colors.black, fontWeight: "700", fontSize: 15 },
 });

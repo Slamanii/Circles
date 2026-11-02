@@ -2,10 +2,9 @@ import { Audio } from "expo-av";
 import * as Clipboard from "expo-clipboard";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useRef, useState } from "react";
 import { Alert, Keyboard, KeyboardAvoidingView, Platform, Share, StyleSheet, View } from "react-native";
-import { useAppTheme } from "../../context/ThemeContext";
-import { getColors } from "../../shared/theme";
 
 import { Message, PollVote, RawGroupMember, RawMessage } from "../../../shared/Types";
 import { ChatHeader } from "../../components/chat/ChatHeader";
@@ -25,8 +24,6 @@ import { uploadMedia } from "../../services/upload";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export function ChatScreen({ route, navigation }: any) {
-    const C = getColors(useAppTheme().theme);
-
     const { group } = route.params;
     const groupId: string = group.id ?? group.groupId;
 
@@ -520,7 +517,12 @@ export function ChatScreen({ route, navigation }: any) {
     })();
 
     return (
-        <View style={[styles.container, { backgroundColor: C.background }]}>
+        <View style={styles.container}>
+            <LinearGradient
+                colors={["rgba(45,27,69,0.6)", "#120A18", "rgba(232,90,160,0.35)"]}
+                locations={[0, 0.5, 1]}
+                style={StyleSheet.absoluteFill}
+            />
             {selectionMode ? (
                 <SelectionToolbar
                     count={selectedIds.size}

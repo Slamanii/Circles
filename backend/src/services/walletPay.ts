@@ -10,7 +10,7 @@ import {
     getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
 import { TOKENS } from "../../../shared/constants";
-import { CONNECTION, treasuryWeb3Keypair } from "../mod/events";
+import { CONNECTION, treasuryWeb3Keypair, assertEventNotCancelled } from "../mod/events";
 import { supabase } from "./supabase";
 import { notifyUser } from "./realtime";
 
@@ -70,6 +70,7 @@ export async function getPaymentOptions(eventId: string, tierId: string, quantit
     if (!Number.isFinite(quantity) || quantity < 1 || quantity > MAX_TICKETS_PER_USER) {
         throw new Error(`Quantity must be between 1 and ${MAX_TICKETS_PER_USER}`);
     }
+    await assertEventNotCancelled(eventId);
 
     // Check how many tickets this user already owns or has reserved for this event
     const { count: owned } = await supabase
@@ -144,6 +145,76 @@ export async function getPaymentOptions(eventId: string, tierId: string, quantit
     };
 }
 
+export async function claimFreeTicket({
+    userId,
+    eventId,
+    tierId,
+    quantity,
+}: {
+    userId: string;
+    eventId: string;
+    tierId: string;
+    quantity: number;
+}) {
+    if (!Number.isFinite(quantity) || quantity < 1 || quantity > MAX_TICKETS_PER_USER) {
+        throw new Error(`Quantity must be between 1 and ${MAX_TICKETS_PER_USER}`);
+    }
+    await assertEventNotCancelled(eventId);
+
+    const { count: owned } = await supabase
+        .from("collectibles")
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", eventId)
+        .eq("owner_id", userId);
+
+    if ((owned ?? 0) + quantity > MAX_TICKETS_PER_USER) {
+        throw new Error(`Would exceed the ${MAX_TICKETS_PER_USER} ticket limit for this event`);
+    }
+
+    const { data: tier } = await supabase
+        .from("ticket_tiers")
+        .select("free, name")
+        .eq("id", tierId)
+        .eq("event_id", eventId)
+        .single();
+
+    if (!tier) throw new Error("Ticket tier not found");
+    if (!tier.free) throw new Error("This tier is not free");
+
+    const { data: reserved, error: reserveError } = await supabase
+        .rpc("reserve_tickets", { p_event_id: eventId, p_quantity: quantity, p_user_id: userId, p_tier_id: tierId });
+
+    if (reserveError) throw reserveError;
+    if (!reserved || reserved.length === 0) throw new Error("Event sold out");
+
+    const ids = reserved.map((t: { id: string }) => t.id);
+
+    await supabase
+        .from("collectibles")
+        .update({ custodian: "user", status: "active", sold_at: new Date().toISOString() })
+        .in("id", ids);
+
+    const { data: event } = await supabase.from("events").select("group_id").eq("id", eventId).single();
+    if (event?.group_id) {
+        await supabase
+            .from("group_members")
+            .upsert(
+                { group_id: event.group_id, user_id: userId, role: "member" },
+                { onConflict: "group_id,user_id" },
+            );
+    }
+
+    await notifyUser(userId, {
+        type: "collectible_purchase_confirmed",
+        body: `You claimed ${reserved.length} free ticket(s)`,
+        reference_id: eventId,
+        reference_type: "event",
+        metadata: { eventId },
+    });
+
+    return { success: true, ticketsClaimed: reserved.length };
+}
+
 export async function confirmWalletPurchase({
     userId,
     eventId,
@@ -207,6 +278,41 @@ export async function confirmWalletPurchase({
         if (!received) throw new Error("No payment found in this transaction");
         receivedRaw = received.tokenAmount;
         payerAddress = received.fromUserAccount;
+    }
+
+    // --- The event may have been cancelled between quote and payment landing ---
+    // The payment is real and irreversible by now — refund it rather than keep it.
+    const { data: eventRow } = await supabase.from("events").select("status").eq("id", eventId).single();
+    if (eventRow?.status === "cancelled") {
+        try {
+            const refundSignature = await refundTreasuryPayment({
+                tokenMint, rawAmount: receivedRaw, destination: payerAddress,
+            });
+            await supabase.from("tx_history").insert({
+                wallet_role: "treasury",
+                tx_signature: refundSignature,
+                action: "refund",
+                to_wallet: payerAddress,
+            });
+            await notifyUser(userId, {
+                type: "event_cancelled",
+                body: "This event was cancelled and your payment was refunded",
+                reference_id: eventId,
+                reference_type: "event",
+                metadata: { eventId },
+            }).catch(console.error);
+        } catch (refundErr) {
+            console.error(
+                `REFUND FAILED (event cancelled) — treasury owes ${receivedRaw} of ${tokenMint} to ${payerAddress} ` +
+                `(tx ${txSignature}, event ${eventId}, user ${userId}):`,
+                refundErr,
+            );
+            throw new Error(
+                "This event was cancelled and the automatic refund failed — please contact support " +
+                `with this reference: ${txSignature}`
+            );
+        }
+        throw new Error("This event was cancelled — you've been refunded");
     }
 
     // --- Claim this signature so it can't be redeemed for tickets twice ---
@@ -307,7 +413,7 @@ export async function confirmWalletPurchase({
     // --- Claim the already-reserved tickets (owner_id was set at reservation time) ---
     await supabase
         .from("collectibles")
-        .update({ custodian: "user", status: "active" })
+        .update({ custodian: "user", status: "active", sold_at: new Date().toISOString() })
         .in("id", reservedRows.map(t => t.id));
 
     // --- Log treasury transactions ---

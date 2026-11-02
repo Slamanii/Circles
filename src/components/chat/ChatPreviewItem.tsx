@@ -1,7 +1,6 @@
 import { View, Text, TouchableOpacity } from "react-native"
 import { Image } from "expo-image"
-import { useAppTheme } from "../../context/ThemeContext"
-import { getColors } from "../../shared/theme"
+import { Colors } from "../../shared/theme"
 
 export function ChatPreviewItem({
     groupName,
@@ -14,9 +13,6 @@ export function ChatPreviewItem({
     onPress,
     onLongPress,
 }: any) {
-    const { theme } = useAppTheme();
-    const C = getColors(theme);
-
     return (
         <TouchableOpacity
             onPress={onPress}
@@ -24,10 +20,10 @@ export function ChatPreviewItem({
             style={{
                 flexDirection: "row",
                 alignItems: "center",
+                backgroundColor: "rgba(255,255,255,0.06)",
+                borderRadius: 20,
                 paddingVertical: 12,
-                paddingHorizontal: 16,
-                borderBottomWidth: 0.5,
-                borderBottomColor: theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.12)",
+                paddingHorizontal: 14,
             }}
         >
             <Image
@@ -41,15 +37,16 @@ export function ChatPreviewItem({
             />
 
             <View style={{ flex: 1 }}>
-                <Text style={{ fontWeight: "bold", fontSize: 16, color: C.text }}>
+                <Text style={{ fontWeight: "700", fontSize: 15, color: "#fff" }} numberOfLines={1}>
                     {groupName}
                 </Text>
 
                 <Text
                     numberOfLines={1}
                     style={{
-                        color: muted ? C.textMuted : C.textSecondary,
-                        marginTop: 2,
+                        color: muted ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.6)",
+                        fontSize: 13,
+                        marginTop: 3,
                     }}
                 >
                     {muted ? "🔇 " : ""}
@@ -57,8 +54,8 @@ export function ChatPreviewItem({
                 </Text>
             </View>
 
-            <View style={{ alignItems: "flex-end" }}>
-                <Text style={{ color: C.textSecondary, fontSize: 12 }}>
+            <View style={{ alignItems: "flex-end", marginLeft: 8 }}>
+                <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>
                     {time}
                 </Text>
 
@@ -76,12 +73,12 @@ export function ChatPreviewItem({
                             height: 20,
                             borderRadius: 10,
                             paddingHorizontal: 6,
-                            backgroundColor: C.accent,
+                            backgroundColor: Colors.accent,
                             alignItems: "center",
                             justifyContent: "center",
                         }}
                     >
-                        <Text style={{ color: "#fff", fontSize: 12, fontWeight: "700" }}>
+                        <Text style={{ color: Colors.black, fontSize: 12, fontWeight: "700" }}>
                             {unreadCount > 99 ? "99+" : unreadCount}
                         </Text>
                     </View>

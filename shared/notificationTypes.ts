@@ -13,6 +13,11 @@ export const NOTIFICATION_TYPES = [
     "collectible_received",            // an in-app ticket transfer landed in your wallet
     "collectible_purchase_confirmed",  // wallet or Paystack purchase claimed your tickets
     "wallet_reservation_refunded",     // a lapsed reservation's payment was refunded
+    "event_updated",                   // the date/venue of an event you hold a ticket to changed
+    "event_cancelled",                 // an event you hold a ticket to was cancelled
+    "story_commented",                 // someone commented on your story
+    "story_comment_reply",             // someone replied to your comment on a story
+    "story_comment_liked",             // someone liked your comment on a story
 ] as const;
 
 export type NotificationType = typeof NOTIFICATION_TYPES[number];
@@ -33,6 +38,11 @@ export const NOTIFICATION_META: Record<NotificationType, { title: string }> = {
     collectible_received: { title: "Ticket received" },
     collectible_purchase_confirmed: { title: "Purchase confirmed" },
     wallet_reservation_refunded: { title: "Reservation expired" },
+    event_updated: { title: "Event updated" },
+    event_cancelled: { title: "Event cancelled" },
+    story_commented: { title: "New comment" },
+    story_comment_reply: { title: "New reply" },
+    story_comment_liked: { title: "New like" },
 };
 
 // Shape of a row in the `notifications` table.

@@ -9,14 +9,15 @@ import NotificationListener from "./screens/notificationProvider";
 import SplashScreen from "./screens/Auth/SplashScreen";
 import WelcomeScreen from "./screens/Auth/WelcomeScreen";
 import SignInScreen from "./screens/Auth/SignInScreen";
+import ForgotPasswordScreen from "./screens/Auth/ForgotPasswordScreen";
 import CreateAccountScreen from "./screens/Auth/CreateAccountScreen";
 
-const WALLET_IDENTITY = { name: "Fuego", uri: "https://fuego.app", icon: "favicon.ico" };
+const WALLET_IDENTITY = { name: "Linked", uri: "https://linked.com", icon: "favicon.ico" };
 
 export type RootStackParamList = {
     ChatListScreen:   { chatId: string };
     ChatRoom:         { chatId: string };
-    EventDetails:     { eventId: string };
+    checkout:         { eventId: string };
     TicketInfo:       { ticketId?: string; ticket?: any };
     UserProfile:      { followingId: string };
     StoryDetail:      { storyId: string; subId?: string };
@@ -25,7 +26,7 @@ export type RootStackParamList = {
 
 export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
-type AuthStep = "welcome" | "signin" | "create";
+type AuthStep = "welcome" | "signin" | "create" | "forgot";
 
 export default function App() {
     const [ready,           setReady]           = useState(false);
@@ -71,6 +72,14 @@ export default function App() {
                 <SignInScreen
                     onSuccess={handleLogin}
                     onGoToCreate={() => setAuthStep("create")}
+                    onForgotPassword={() => setAuthStep("forgot")}
+                />
+            );
+        }
+        if (authStep === "forgot") {
+            return (
+                <ForgotPasswordScreen
+                    onBackToSignIn={() => setAuthStep("signin")}
                 />
             );
         }

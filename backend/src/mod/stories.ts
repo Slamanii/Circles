@@ -64,18 +64,20 @@ export async function viewStory({
     return true;
 }
 
+// Likes are scoped to the parent story, not any one sub-story segment, so a
+// post that spans several segments carries one consistent like count.
 export async function likeStory({
-    storyItemId,
+    storyId,
     userId,
 }: {
-    storyItemId: string;
+    storyId: string;
     userId: string;
 }) {
 
     const { error } = await supabase
         .from("story_likes")
         .insert({
-            story_item_id: storyItemId,
+            story_id: storyId,
             user_id: userId,
         });
 
@@ -83,19 +85,18 @@ export async function likeStory({
         throw error;
     }
 
-    const { data: item } = await supabase
-        .from("story_items")
-        .select("id, stories!inner(id, user_id)")
-        .eq("id", storyItemId)
+    const { data: story } = await supabase
+        .from("stories")
+        .select("id, user_id")
+        .eq("id", storyId)
         .single();
-    const parentStory = item?.stories?.[0];
-    if (parentStory && parentStory.user_id !== userId) {
-        await notifyUser(parentStory.user_id, {
+    if (story && story.user_id !== userId) {
+        await notifyUser(story.user_id, {
             type: "story_liked",
             body: "Someone liked your story",
-            reference_id: storyItemId,
-            reference_type: "story_item",
-            metadata: { storyId: parentStory.id, subId: storyItemId },
+            reference_id: storyId,
+            reference_type: "story",
+            metadata: { storyId },
         });
     }
 
@@ -103,17 +104,17 @@ export async function likeStory({
 }
 
 export async function unlikeStory({
-    storyItemId,
+    storyId,
     userId,
 }: {
-    storyItemId: string;
+    storyId: string;
     userId: string;
 }) {
 
     const { error } = await supabase
         .from("story_likes")
         .delete()
-        .eq("story_item_id", storyItemId)
+        .eq("story_id", storyId)
         .eq("user_id", userId);
 
     if (error) throw error;
@@ -167,7 +168,8 @@ export async function deleteStory(storyId: string, userId: string) {
 
     const subIds = subs?.map(s => s.id) ?? [];
 
-    await supabase.from("story_likes").delete().in("story_item_id", subIds);
+    await supabase.from("story_likes").delete().eq("story_id", storyId);
+    await supabase.from("story_comments").delete().eq("story_id", storyId);
     await supabase.from("story_views").delete().in("story_item_id", subIds);
 
     await supabase.from("story_items").delete().eq("story_id", storyId);
@@ -335,7 +337,7 @@ export async function fetchStoryViews(subStoryId: string) {
 }
 
 
-export async function fetchStoryLikes(subStoryId: string) {
+export async function fetchStoryLikes(storyId: string) {
 
   const { data, error } = await supabase
     .from("story_likes")
@@ -343,9 +345,153 @@ export async function fetchStoryLikes(subStoryId: string) {
       user_id,
       users (username, avatar)
     `)
-    .eq("story_item_id", subStoryId);
+    .eq("story_id", storyId);
 
   if (error) throw error;
 
   return data;
+}
+
+// One level of replies (not infinite nesting) — a reply's parent_comment_id
+// always points at a top-level comment, mirrored in how the client groups them.
+// Comments are scoped to the parent story (not a sub-story segment), same as likes.
+export async function addComment({
+    storyId,
+    userId,
+    content,
+    parentCommentId,
+}: {
+    storyId: string;
+    userId: string;
+    content: string;
+    parentCommentId?: string;
+}) {
+    const trimmed = content?.trim();
+    if (!trimmed) throw new Error("Comment cannot be empty");
+
+    const { data: comment, error } = await supabase
+        .from("story_comments")
+        .insert({
+            story_id: storyId,
+            user_id: userId,
+            content: trimmed,
+            parent_comment_id: parentCommentId ?? null,
+        })
+        .select("id, story_id, parent_comment_id, content, created_at, user_id, users(username, avatar)")
+        .single();
+
+    if (error) throw error;
+
+    const { data: story } = await supabase
+        .from("stories")
+        .select("id, user_id")
+        .eq("id", storyId)
+        .single();
+
+    if (parentCommentId) {
+        const { data: parentComment } = await supabase
+            .from("story_comments")
+            .select("user_id")
+            .eq("id", parentCommentId)
+            .single();
+        if (parentComment && parentComment.user_id !== userId) {
+            await notifyUser(parentComment.user_id, {
+                type: "story_comment_reply",
+                body: "Someone replied to your comment",
+                reference_id: storyId,
+                reference_type: "story",
+                metadata: { storyId, commentId: comment.id },
+            });
+        }
+    } else if (story && story.user_id !== userId) {
+        await notifyUser(story.user_id, {
+            type: "story_commented",
+            body: "Someone commented on your story",
+            reference_id: storyId,
+            reference_type: "story",
+            metadata: { storyId, commentId: comment.id },
+        });
+    }
+
+    return comment;
+}
+
+export async function deleteComment(commentId: string, userId: string) {
+    const { data: comment } = await supabase
+        .from("story_comments")
+        .select("user_id")
+        .eq("id", commentId)
+        .single();
+
+    if (!comment || comment.user_id !== userId) throw new Error("Unauthorized");
+
+    const { error } = await supabase.from("story_comments").delete().eq("id", commentId);
+    if (error) throw error;
+    return true;
+}
+
+export async function fetchComments(storyId: string, viewerId?: string) {
+    const { data: comments, error } = await supabase
+        .from("story_comments")
+        .select("id, parent_comment_id, content, created_at, user_id, users(username, avatar)")
+        .eq("story_id", storyId)
+        .order("created_at", { ascending: true });
+
+    if (error) throw error;
+    if (!comments?.length) return [];
+
+    const commentIds = comments.map(c => c.id);
+    const { data: likes } = await supabase
+        .from("story_comment_likes")
+        .select("comment_id, user_id")
+        .in("comment_id", commentIds);
+
+    const likeCountByComment = new Map<string, number>();
+    const likedByViewer = new Set<string>();
+    for (const like of likes ?? []) {
+        likeCountByComment.set(like.comment_id, (likeCountByComment.get(like.comment_id) ?? 0) + 1);
+        if (viewerId && like.user_id === viewerId) likedByViewer.add(like.comment_id);
+    }
+
+    return comments.map(c => ({
+        ...c,
+        likeCount: likeCountByComment.get(c.id) ?? 0,
+        likedByViewer: likedByViewer.has(c.id),
+    }));
+}
+
+export async function likeComment({ commentId, userId }: { commentId: string; userId: string }) {
+    const { error } = await supabase
+        .from("story_comment_likes")
+        .insert({ comment_id: commentId, user_id: userId });
+
+    if (error && error.code !== "23505") throw error;
+
+    const { data: comment } = await supabase
+        .from("story_comments")
+        .select("user_id, story_id")
+        .eq("id", commentId)
+        .single();
+    if (comment && comment.user_id !== userId) {
+        await notifyUser(comment.user_id, {
+            type: "story_comment_liked",
+            body: "Someone liked your comment",
+            reference_id: commentId,
+            reference_type: "story_comment",
+            metadata: { commentId, storyId: comment.story_id },
+        });
+    }
+
+    return true;
+}
+
+export async function unlikeComment({ commentId, userId }: { commentId: string; userId: string }) {
+    const { error } = await supabase
+        .from("story_comment_likes")
+        .delete()
+        .eq("comment_id", commentId)
+        .eq("user_id", userId);
+
+    if (error) throw error;
+    return true;
 }

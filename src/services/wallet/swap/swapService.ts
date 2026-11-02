@@ -1,7 +1,7 @@
 export async function getSwapQuote(
     inputMint: string,
     outputMint: string,
-    amount: number,   // human-readable amount
+    amount: number,   
     decimals: number, // input token decimals (e.g. 9 for SOL, 6 for USDC)
 ) {
     const rawAmount = Math.floor(amount * Math.pow(10, decimals));

@@ -5,20 +5,25 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { BlurView } from "expo-blur";
 import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { useAppTheme } from "../context/ThemeContext";
+import { Colors } from "../shared/theme";
 
 import { ChatControlScreen } from "../screens/Chat/chatcontrolscreen";
 import { ChatListScreen } from "../screens/Chat/chatlistscreen";
 import { ChatScreen } from "../screens/Chat/chatscreen";
 import MediaViewerScreen from "../screens/Chat/MediaViewerScreen";
 import CollectiblesScreen from "../screens/Collectibles/collectiblesscreen";
+import ScanEventsScreen from "../screens/Collectibles/ScanEventsScreen";
+import ScanTicketScreen from "../screens/Collectibles/ScanTicketScreen";
 import SendTicketScreen from "../screens/Collectibles/sendTicketScreen";
 import TicketInfoScreen from "../screens/Collectibles/TicketInfoScreen";
 import TicketQRScreen from "../screens/Collectibles/TicketQRScreen";
 import CreateEventScreen from "../screens/Event/createEventScreen";
+import EventEditScreen from "../screens/Event/eventEditScreen";
 import EventInfoScreen from "../screens/Event/eventInfoScreen";
 import EventPurchaseScreen from "../screens/Event/eventPurchaseScreen";
-import EventScreen from "../screens/Event/eventscreen";
+import ArtistsScreen from "../screens/Home/ArtistsScreen";
 import HomeScreen from "../screens/Home/homescreen";
+import PromotersScreen from "../screens/Home/PromotersScreen";
 import NotificationsScreen from "../screens/Notifications/notificationsscreen";
 import StoriesSearchScreen from "../screens/Search/storiessearchscreen";
 import StoryScreen from "../screens/Stories/storiesscreen";
@@ -42,10 +47,10 @@ import WalletScreen from "../screens/Wallet/walletscreen";
 
 // Screens inside these stacks that have a back button → hide the floating tab bar
 const HIDE_TAB_ON: Record<string, string[]> = {
-  Home:         ["EventDetails", "ChatListScreen", "ChatScreen", "ChatControl", "Notifications", "MediaViewer"],
-  Search:       ["StoryDetail", "StoryUpload", "UserProfile", "FollowList", "EventInfo"],
-  Collectibles: ["TicketInfo", "TicketQR", "SendTicket"],
-  Profile:      ["lists", "UserProfile", "FollowList", "EventInfo", "WalletStack"],
+  Home:         ["ChatListScreen", "ChatScreen", "ChatControl", "Notifications", "MediaViewer", "Artists", "Promoters"],
+  Search:       ["StoryDetail", "StoryUpload", "UserProfile", "FollowList", "EventInfo", "EventEdit", "MediaViewer"],
+  Collectibles: ["TicketInfo", "TicketQR", "SendTicket", "ScanEvents", "ScanTicket"],
+  Profile:      ["lists", "UserProfile", "FollowList", "EventInfo", "EventEdit", "WalletStack", "StoryDetail", "MediaViewer"],
 };
 
 const Tab = createBottomTabNavigator();
@@ -56,7 +61,8 @@ function HomeStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="HomeMain"      component={HomeScreen} />
-      <Stack.Screen name="EventDetails"  component={EventScreen} />
+      <Stack.Screen name="Artists"       component={ArtistsScreen} />
+      <Stack.Screen name="Promoters"     component={PromotersScreen} />
       <Stack.Screen name="ChatListScreen" component={ChatListScreen} />
       <Stack.Screen name="ChatScreen"    component={ChatScreen} />
       <Stack.Screen name="ChatControl"   component={ChatControlScreen} />
@@ -73,6 +79,8 @@ function CollectiblesStack() {
       <Stack.Screen name="TicketInfo" component={TicketInfoScreen} />
       <Stack.Screen name="TicketQR" component={TicketQRScreen} />
       <Stack.Screen name="SendTicket" component={SendTicketScreen} />
+      <Stack.Screen name="ScanEvents" component={ScanEventsScreen} />
+      <Stack.Screen name="ScanTicket" component={ScanTicketScreen} />
     </Stack.Navigator>
   )
 }
@@ -104,6 +112,8 @@ function SearchStack() {
       <Stack.Screen name="UserProfile" component={UserScreen} />
       <Stack.Screen name="FollowList" component={FollowListScreen} />
       <Stack.Screen name="EventInfo" component={EventInfoScreen} />
+      <Stack.Screen name="EventEdit" component={EventEditScreen} />
+      <Stack.Screen name="MediaViewer" component={MediaViewerScreen} />
     </Stack.Navigator>
   );
 }
@@ -116,7 +126,10 @@ function UserStack() {
       <Stack.Screen name="UserProfile" component={UserScreen} />
       <Stack.Screen name="FollowList" component={FollowListScreen} />
       <Stack.Screen name="EventInfo" component={EventInfoScreen} />
+      <Stack.Screen name="EventEdit" component={EventEditScreen} />
       <Stack.Screen name="WalletStack" component={WalletStack} />
+      <Stack.Screen name="StoryDetail" component={StoryScreen} />
+      <Stack.Screen name="MediaViewer" component={MediaViewerScreen} />
     </Stack.Navigator>
   )
 }
@@ -207,7 +220,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
           >
             {isFocused ? (
               <View style={tabStyles.activeIconWrap}>
-                <Ionicons name={name} size={18} color="#fff" />
+                <Ionicons name={name} size={18} color={Colors.black} />
               </View>
             ) : (
               <Ionicons name={name} size={18} color={isDark ? "#F0EEE9" : "#0A0A0A"} />
@@ -241,6 +254,12 @@ export default function Navigation() {
       <Root.Screen name="checkout" component={EventPurchaseScreen} />
       <Root.Screen name="Settings" component={SettingsScreen} />
       <Root.Screen name="EditProfile" component={EditProfileScreen} />
+      {/* Root-level fallback so screens with no local "UserProfile" in their
+          own stack (Home, checkout) can still reach it — navigate() only
+          bubbles up through ancestors, not sideways into a sibling tab's
+          stack. Search/Profile keep using their own in-tab copy since it's
+          found first (closest match wins). */}
+      <Root.Screen name="UserProfile" component={UserScreen} />
     </Root.Navigator>
   );
 }
@@ -276,7 +295,7 @@ const tabStyles = StyleSheet.create({
     justifyContent: "center",
   },
   activeIconWrap: {
-    backgroundColor: "#E8622A",
+    backgroundColor: Colors.accent,
     width: ACTIVE_ICON_WIDTH,
     height: ACTIVE_ICON_HEIGHT,
     borderRadius: ACTIVE_ICON_HEIGHT / 2,

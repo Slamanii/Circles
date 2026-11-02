@@ -16,6 +16,7 @@ import { makeCustodialSigner } from "../../../services/wallet/custodialSign";
 import { sendSol, sendSplToken } from "../../../services/wallet/send";
 import { emitBalanceChanged } from "../../../services/wallet/walletEvents";
 import { Token } from "../../../../shared/Types";
+import { Colors } from "../../../shared/theme";
 
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 
@@ -107,7 +108,7 @@ export default function ConfirmSendScreen({ navigation, route }: any) {
                 disabled={loading || !canSign}
             >
                 {loading
-                    ? <ActivityIndicator color="#fff" />
+                    ? <ActivityIndicator color={Colors.black} />
                     : <Text style={styles.sendText}>Confirm & Send</Text>
                 }
             </TouchableOpacity>
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
     },
     warningText: { color: "#F59E0B", fontSize: 13 },
     sendBtn: {
-        backgroundColor: "#E8622A",
+        backgroundColor: Colors.accent,
         borderRadius: 14,
         paddingVertical: 16,
         alignItems: "center",
@@ -157,5 +158,5 @@ const styles = StyleSheet.create({
         right: 16,
     },
     disabled:  { opacity: 0.4 },
-    sendText:  { color: "#fff", fontWeight: "700", fontSize: 16 },
+    sendText:  { color: Colors.black, fontWeight: "700", fontSize: 16 },
 });

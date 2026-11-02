@@ -1,8 +1,10 @@
 import { useState } from "react";
 import {
-    ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+    ActivityIndicator, Alert, ImageBackground, KeyboardAvoidingView, Platform,
     StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { Login } from "../../services/login";
 import { Colors } from "../../shared/theme";
 import PasswordInput from "../../components/PasswordInput";
@@ -10,9 +12,10 @@ import PasswordInput from "../../components/PasswordInput";
 type Props = {
     onSuccess: (user: any, token: string) => void;
     onGoToCreate: () => void;
+    onForgotPassword: () => void;
 };
 
-export default function SignInScreen({ onSuccess, onGoToCreate }: Props) {
+export default function SignInScreen({ onSuccess, onGoToCreate, onForgotPassword }: Props) {
     const [email,    setEmail]    = useState("");
     const [password, setPassword] = useState("");
     const [loading,  setLoading]  = useState(false);
@@ -35,98 +38,139 @@ export default function SignInScreen({ onSuccess, onGoToCreate }: Props) {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
+        <ImageBackground
+            source={require("../../assets/images/img_6780.jpg")}
+            style={styles.bg}
+            resizeMode="cover"
         >
-            <View style={styles.inner}>
-                <View style={styles.header}>
-                    <Text style={styles.title}>Sign In</Text>
-                    <Text style={styles.sub}>Welcome back</Text>
+            <LinearGradient
+                colors={["rgba(13,13,13,0.15)", "rgba(13,13,13,0.55)", "rgba(13,13,13,0.96)"]}
+                locations={[0, 0.5, 0.85]}
+                style={StyleSheet.absoluteFill}
+            />
+            <KeyboardAvoidingView
+                style={styles.container}
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
+            >
+                <View style={styles.inner}>
+                    <BlurView intensity={40} tint="dark" style={styles.card}>
+                        <View style={styles.cardInner}>
+                            <View style={styles.header}>
+                                <Text style={styles.title}>Sign In</Text>
+                                <Text style={styles.sub}>Welcome back</Text>
+                            </View>
+
+                            <View style={styles.fields}>
+                                <TextInput
+                                    style={styles.input}
+                                    placeholder="Email"
+                                    placeholderTextColor="#888"
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    autoCapitalize="none"
+                                    keyboardType="email-address"
+                                    returnKeyType="next"
+                                />
+                                <PasswordInput
+                                    placeholder="Password"
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    returnKeyType="done"
+                                    onSubmitEditing={handleSignIn}
+                                />
+                            </View>
+
+                            <TouchableOpacity style={styles.forgotRow} onPress={onForgotPassword} hitSlop={8}>
+                                <Text style={styles.forgotText}>Forgot Password?</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.confirmBtn, (!email || !password || loading) && styles.disabled]}
+                                onPress={handleSignIn}
+                                disabled={!email || !password || loading}
+                                activeOpacity={0.85}
+                            >
+                                {loading
+                                    ? <ActivityIndicator color="#000" />
+                                    : <Text style={styles.confirmText}>Sign In  →</Text>
+                                }
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.switchRow} onPress={onGoToCreate}>
+                                <Text style={styles.switchText}>
+                                    Don't have an account?{"  "}
+                                    <Text style={styles.switchLink}>Create one</Text>
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </BlurView>
                 </View>
-
-                <View style={styles.fields}>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Email"
-                        placeholderTextColor="#555"
-                        value={email}
-                        onChangeText={setEmail}
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                        returnKeyType="next"
-                    />
-                    <PasswordInput
-                        placeholder="Password"
-                        value={password}
-                        onChangeText={setPassword}
-                        returnKeyType="done"
-                        onSubmitEditing={handleSignIn}
-                    />
-                </View>
-
-                <TouchableOpacity
-                    style={[styles.confirmBtn, (!email || !password || loading) && styles.disabled]}
-                    onPress={handleSignIn}
-                    disabled={!email || !password || loading}
-                    activeOpacity={0.85}
-                >
-                    {loading
-                        ? <ActivityIndicator color="#000" />
-                        : <Text style={styles.confirmText}>Sign In  →</Text>
-                    }
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.switchRow} onPress={onGoToCreate}>
-                    <Text style={styles.switchText}>
-                        Don't have an account?{"  "}
-                        <Text style={styles.switchLink}>Create one</Text>
-                    </Text>
-                </TouchableOpacity>
-            </View>
-        </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+        </ImageBackground>
     );
 }
 
 const styles = StyleSheet.create({
+    bg: {
+        flex: 1,
+    },
     container: {
         flex: 1,
-        backgroundColor: "#0D0D0D",
     },
     inner: {
         flex: 1,
         paddingHorizontal: 24,
-        paddingTop: 100,
         paddingBottom: 50,
-        justifyContent: "center",
+        justifyContent: "flex-end",
+    },
+    card: {
+        borderRadius: 28,
+        overflow: "hidden",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.14)",
+    },
+    cardInner: {
+        backgroundColor: "rgba(20,20,20,0.35)",
+        paddingHorizontal: 24,
+        paddingTop: 32,
+        paddingBottom: 28,
     },
     header: {
-        marginBottom: 36,
+        marginBottom: 28,
         gap: 6,
     },
     title: {
         color: "#fff",
-        fontSize: 32,
+        fontSize: 30,
         fontWeight: "800",
         letterSpacing: -0.5,
     },
     sub: {
-        color: "#666",
+        color: "rgba(255,255,255,0.6)",
         fontSize: 14,
     },
     fields: {
         gap: 12,
-        marginBottom: 24,
+        marginBottom: 10,
     },
     input: {
-        backgroundColor: "#1A1A1A",
+        backgroundColor: "rgba(255,255,255,0.08)",
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 16,
         fontSize: 15,
         color: "#fff",
         borderWidth: 1,
-        borderColor: "#2A2A2A",
+        borderColor: "rgba(255,255,255,0.16)",
+    },
+    forgotRow: {
+        alignSelf: "flex-end",
+        marginBottom: 24,
+    },
+    forgotText: {
+        color: "rgba(255,255,255,0.7)",
+        fontSize: 13,
+        fontWeight: "500",
     },
     confirmBtn: {
         backgroundColor: "#fff",
@@ -147,11 +191,11 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     switchText: {
-        color: "#666",
+        color: "rgba(255,255,255,0.6)",
         fontSize: 14,
     },
     switchLink: {
-        color: Colors.accent,
+        color: Colors.accentText,
         fontWeight: "600",
     },
 });

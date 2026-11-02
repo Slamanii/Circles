@@ -16,8 +16,6 @@ const CHAT_LIST_RESYNC_TYPES = new Set([
 export function useChatListLogic() {
 
     const navigation = useNavigation<any>();
-    const [archiveFilter, setArchiveFilter] = useState<"all" | "archived" | "deleted" | "pending">("all");
-    const [selectionMode, setSelectionMode] = useState(false);
     const [username, setUsername] = useState("");
     const [groups, setGroups] = useState<any[]>([]);
     const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
@@ -90,12 +88,6 @@ export function useChatListLogic() {
         setRefreshing(false);
     }, [load]);
 
-    const toggleSelection = () => setSelectionMode(prev => !prev);
-
-    const handleFilterChange = (value: "all" | "archived" | "deleted" | "pending") => {
-        setArchiveFilter(value);
-    };
-
     const onGroupPress = (group: any) => {
         navigation.navigate("ChatScreen", { group });
     };
@@ -106,11 +98,8 @@ export function useChatListLogic() {
         unreadCounts,
         refreshing,
         onRefresh,
-        archiveFilter,
-        selectionMode,
-        onFilterChange: handleFilterChange,
-        onToggleSelection: toggleSelection,
         onGroupPress,
         onBack: () => navigation.goBack(),
+        onNotificationsPress: () => navigation.navigate("Notifications"),
     };
 }

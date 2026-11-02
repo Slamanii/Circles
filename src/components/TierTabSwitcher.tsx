@@ -4,6 +4,11 @@ import { Colors, Radius, getColors } from "../shared/theme";
 import { TicketTier } from "../hooks/useEvents";
 
 const TIER_ORDER = ["Base", "VIP", "VIP++"] as const;
+// Unlike Base/VIP/VIP++ (always shown, dimmed when absent), Group and Free
+// are optional add-ons most events won't have at all — their tab only
+// appears when the event actually has that tier, so the row resizes from
+// 3 tabs up to 5 instead of always reserving space for tiers that don't exist.
+const OPTIONAL_TIER_ORDER = ["Group", "Free"] as const;
 
 type Props = {
     tiers: TicketTier[];
@@ -14,9 +19,14 @@ type Props = {
 export default function TierTabSwitcher({ tiers, active, onChange }: Props) {
     const C = getColors(useAppTheme().theme);
 
+    const visibleTiers = [
+        ...TIER_ORDER,
+        ...OPTIONAL_TIER_ORDER.filter((name) => tiers.some((t) => t.name === name)),
+    ];
+
     return (
         <View style={[styles.wrap, { backgroundColor: C.card }]}>
-            {TIER_ORDER.map((name) => {
+            {visibleTiers.map((name) => {
                 const isActive = active === name;
                 const exists = tiers.some((t) => t.name === name);
 
@@ -30,7 +40,7 @@ export default function TierTabSwitcher({ tiers, active, onChange }: Props) {
                         <Text
                             style={[
                                 styles.tabText,
-                                { color: isActive ? Colors.white : C.textSecondary },
+                                { color: isActive ? Colors.black : C.textSecondary },
                                 !exists && !isActive && styles.tabTextMuted,
                             ]}
                         >

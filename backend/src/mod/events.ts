@@ -12,12 +12,20 @@ import { keypairIdentity, publicKey as umiPublicKey } from "@metaplex-foundation
 import IDL from "../../../target/idl/ticket_program.json";
 import { TicketProgram } from "../../../target/types/ticket_program";
 import bs58 from "bs58";
+import crypto from "crypto";
 import { supabase } from "../services/supabase";
 import { createGroupChat } from "./chat";
 import { notifyUser } from "../services/realtime";
 
 export const CONNECTION = new Connection(process.env.SOLANA_RPC_URL!, "confirmed");
-const PROGRAM_ID = new PublicKey(process.env.PROGRAM_ID!); 
+const PROGRAM_ID = new PublicKey(process.env.PROGRAM_ID!);
+
+// Solana caps each PDA seed at 32 bytes — a UUID's string form (36 bytes,
+// dashes included) exceeds that. Its raw 16-byte form does not. Must match
+// programs/ticket_program/src/program_accounts/bubblegum_mint.rs's uuid_seed().
+function uuidSeed(eventId: string): Buffer {
+    return Buffer.from(eventId.replace(/-/g, ""), "hex");
+}
 
 
 const BUBBLEGUM_PROGRAM_ID = new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY");
@@ -57,7 +65,7 @@ export async function initializeEventOnchain({
   const metadataUri = `${process.env.API_BASE_URL}/api/events/${eventId}/metadata.json`;
 
   const [eventPda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("event"), Buffer.from(eventId)],
+    [Buffer.from("event"), uuidSeed(eventId)],
     PROGRAM_ID,
   );
 
@@ -79,7 +87,18 @@ export async function initializeEventOnchain({
     return tx;
 }
 
- type TierInput = { name: string; price: number; supply: number; info?: string };
+ type TierInput = { name: string; price: number; supply: number; info?: string; groupTicket?: number; free?: boolean };
+
+ export const EVENT_CATEGORIES = ["movie", "professional", "concert", "birthday", "sports", "educational", "private", "other"] as const;
+ export type EventCategory = typeof EVENT_CATEGORIES[number];
+
+ // Capped at 15 names to match the fixed 15-slot entry sheet on the client
+ // (both create and edit). Free text, never on-chain.
+ function parseGuestList(raw: string): string | null {
+    const names = String(raw).split("\n").map(n => n.trim()).filter(Boolean);
+    if (names.length > 15) throw new Error("Guest list is limited to 15 names");
+    return names.length ? names.join("\n") : null;
+ }
 
  export async function createEvent(userId: string, data: any) {
 
@@ -89,9 +108,13 @@ export async function initializeEventOnchain({
         tiers,
         eventDate,
         venue,
-        flyerCard,
+        flyerCards,
         creatorName,
-    } = data as { tiers: TierInput[] } & Record<string, any>;
+        category,
+        customCategory,
+        videoUrl,
+        guestList,
+    } = data as { tiers: TierInput[]; flyerCards?: string[] } & Record<string, any>;
 
     if (!Array.isArray(tiers) || tiers.length === 0) {
         throw new Error("At least one ticket tier is required");
@@ -100,8 +123,30 @@ export async function initializeEventOnchain({
         if (!tier.name || typeof tier.name !== "string") {
             throw new Error("Every tier requires a name");
         }
-        if (!(tier.price > 0)) throw new Error(`Tier "${tier.name}" needs a price greater than 0`);
         if (!(tier.supply > 0)) throw new Error(`Tier "${tier.name}" needs a supply greater than 0`);
+        if (tier.free) {
+            tier.price = 0;
+        } else if (!(tier.price > 0)) {
+            throw new Error(`Tier "${tier.name}" needs a price greater than 0`);
+        }
+        if (tier.groupTicket != null && (!Number.isInteger(tier.groupTicket) || tier.groupTicket < 2)) {
+            throw new Error(`Tier "${tier.name}"'s group size must be an integer of 2 or more`);
+        }
+    }
+
+    const resolvedCategory: EventCategory = category && EVENT_CATEGORIES.includes(category) ? category : "other";
+
+    if (videoUrl && resolvedCategory !== "movie") {
+        throw new Error("A video can only be attached to a movie event");
+    }
+    if (Array.isArray(flyerCards) && flyerCards.length > 1 && resolvedCategory !== "movie") {
+        throw new Error("Only a movie event can have more than one flyer image");
+    }
+    if (resolvedCategory === "other" && customCategory != null) {
+        const trimmed = String(customCategory).trim();
+        if (trimmed.length > 15 || /\s/.test(trimmed)) {
+            throw new Error("Custom category must be a single word of 15 characters or fewer");
+        }
     }
 
     const ticketSupply = tiers.reduce((sum, t) => sum + t.supply, 0);
@@ -115,11 +160,16 @@ export async function initializeEventOnchain({
             title,
             description,
             venue,
-            flyer_card: flyerCard ?? null,
+            flyer_card: flyerCards ?? [],
             creator_id: userId,
             ticket_supply: ticketSupply,
             ticket_price: ticketPrice,
             event_date: eventDate,
+            category: resolvedCategory,
+            custom_category: resolvedCategory === "other" ? (customCategory ?? null) : null,
+            video_url: resolvedCategory === "movie" ? (videoUrl ?? null) : null,
+            invite_token: resolvedCategory === "private" ? crypto.randomBytes(16).toString("hex") : null,
+            guest_list: guestList != null ? parseGuestList(guestList) : null,
         })
         .select()
         .single();
@@ -140,6 +190,8 @@ export async function initializeEventOnchain({
             supply: t.supply,
             info: t.info ?? null,
             sort_order: i,
+            group_ticket: t.groupTicket ?? null,
+            free: !!t.free,
         })))
         .select();
 
@@ -177,6 +229,247 @@ export async function initializeEventOnchain({
     };
  }
 
+ // Generic creator-only event edit. Deliberately excludes tiers/prices/supply —
+ // those are baked into the on-chain max_supply and the already-minted
+ // collectibles rows at creation time, with no live recomputation path, so
+ // "editing" them would desync the display from what's actually sellable
+ // rather than changing capacity. This grows new editable fields (guest list,
+ // cancellation, etc.) as those features are built.
+ export async function updateEvent(eventId: string, userId: string, patch: Record<string, any>) {
+    const { data: event, error: fetchError } = await supabase
+        .from("events")
+        .select("creator_id")
+        .eq("id", eventId)
+        .single();
+
+    if (fetchError || !event) throw new Error("Event not found");
+    if (event.creator_id !== userId) throw new Error("Unauthorized");
+
+    const updates: Record<string, any> = {};
+    if (patch.eventDate !== undefined) updates.event_date = patch.eventDate;
+    if (patch.venue !== undefined) {
+        const venue = String(patch.venue).trim();
+        if (!venue) throw new Error("Venue cannot be empty");
+        updates.venue = venue;
+    }
+    if (patch.guestList !== undefined) updates.guest_list = parseGuestList(patch.guestList);
+
+    if (Object.keys(updates).length === 0) {
+        throw new Error("No editable fields provided");
+    }
+
+    const { data, error } = await supabase
+        .from("events")
+        .update(updates)
+        .eq("id", eventId)
+        .select()
+        .single();
+
+    if (error) throw error;
+
+    // Notify everyone who actually holds a ticket — not pending/reserved rows —
+    // that something about the event they're attending changed.
+    const { data: holders } = await supabase
+        .from("collectibles")
+        .select("owner_id")
+        .eq("event_id", eventId)
+        .eq("status", "active");
+
+    const holderIds = [...new Set((holders ?? []).map(h => h.owner_id).filter(Boolean))];
+    await Promise.all(holderIds.map(holderId =>
+        notifyUser(holderId, {
+            type: "event_updated",
+            body: `${data.title} was updated — check the details`,
+            reference_id: eventId,
+            reference_type: "event",
+            metadata: { eventId },
+        }).catch(console.error)
+    ));
+
+    return data;
+ }
+
+ // Purely decorative — a collaborator shows up as a chip on the event page and
+ // nothing else; they get no edit or management rights over the event.
+ export async function addCollaborator(eventId: string, creatorId: string, collaboratorUserId: string) {
+    const { data: event, error: fetchError } = await supabase
+        .from("events")
+        .select("creator_id")
+        .eq("id", eventId)
+        .single();
+
+    if (fetchError || !event) throw new Error("Event not found");
+    if (event.creator_id !== creatorId) throw new Error("Unauthorized");
+    if (collaboratorUserId === creatorId) throw new Error("The creator doesn't need to be added as a collaborator");
+
+    const { error } = await supabase
+        .from("event_collaborators")
+        .insert({ event_id: eventId, user_id: collaboratorUserId, added_by: creatorId });
+
+    if (error) {
+        if (error.code === "23505") throw new Error("Already a collaborator");
+        throw error;
+    }
+    return { success: true };
+ }
+
+ export async function removeCollaborator(eventId: string, creatorId: string, collaboratorUserId: string) {
+    const { data: event, error: fetchError } = await supabase
+        .from("events")
+        .select("creator_id")
+        .eq("id", eventId)
+        .single();
+
+    if (fetchError || !event) throw new Error("Event not found");
+    if (event.creator_id !== creatorId) throw new Error("Unauthorized");
+
+    const { error } = await supabase
+        .from("event_collaborators")
+        .delete()
+        .eq("event_id", eventId)
+        .eq("user_id", collaboratorUserId);
+
+    if (error) throw error;
+    return { success: true };
+ }
+
+ // Cancel, never delete — the event and every ticket to it stay visible, just
+ // frozen: every purchase-initiating call rejects once status is 'cancelled'.
+ export async function cancelEvent(eventId: string, creatorId: string, notice: string) {
+    const trimmedNotice = notice?.trim();
+    if (!trimmedNotice) throw new Error("A compensation/refund notice is required to cancel an event");
+
+    const { data: event, error: fetchError } = await supabase
+        .from("events")
+        .select("creator_id, title, status")
+        .eq("id", eventId)
+        .single();
+
+    if (fetchError || !event) throw new Error("Event not found");
+    if (event.creator_id !== creatorId) throw new Error("Unauthorized");
+    if (event.status === "cancelled") throw new Error("Event is already cancelled");
+
+    const { error } = await supabase
+        .from("events")
+        .update({ status: "cancelled", cancellation_notice: trimmedNotice })
+        .eq("id", eventId);
+
+    if (error) throw error;
+
+    const { data: holders } = await supabase
+        .from("collectibles")
+        .select("owner_id")
+        .eq("event_id", eventId)
+        .eq("status", "active");
+
+    const holderIds = [...new Set((holders ?? []).map(h => h.owner_id).filter(Boolean))];
+    await Promise.all(holderIds.map(holderId =>
+        notifyUser(holderId, {
+            type: "event_cancelled",
+            body: `${event.title} was cancelled — ${trimmedNotice}`,
+            reference_id: eventId,
+            reference_type: "event",
+            metadata: { eventId },
+        }).catch(console.error)
+    ));
+
+    return { success: true };
+ }
+
+ // Shared guard for every purchase-initiating call site (wallet, Paystack, free
+ // claim) — a cancelled event can't sell any more tickets through any path.
+ export async function assertEventNotCancelled(eventId: string) {
+    const { data: event } = await supabase
+        .from("events")
+        .select("status")
+        .eq("id", eventId)
+        .single();
+
+    if (event?.status === "cancelled") throw new Error("This event has been cancelled");
+ }
+
+ // Same shape as addCollaborator/removeCollaborator — creator-only, a plain
+ // grant row per (event, user).
+ export async function grantScanAccess(eventId: string, creatorId: string, granteeUserId: string) {
+    const { data: event, error: fetchError } = await supabase
+        .from("events")
+        .select("creator_id")
+        .eq("id", eventId)
+        .single();
+
+    if (fetchError || !event) throw new Error("Event not found");
+    if (event.creator_id !== creatorId) throw new Error("Unauthorized");
+    if (granteeUserId === creatorId) throw new Error("The creator already has scan access");
+
+    const { error } = await supabase
+        .from("event_scan_grants")
+        .insert({ event_id: eventId, user_id: granteeUserId, granted_by: creatorId });
+
+    if (error) {
+        if (error.code === "23505") throw new Error("Already granted scan access");
+        throw error;
+    }
+    return { success: true };
+ }
+
+ export async function revokeScanAccess(eventId: string, creatorId: string, granteeUserId: string) {
+    const { data: event, error: fetchError } = await supabase
+        .from("events")
+        .select("creator_id")
+        .eq("id", eventId)
+        .single();
+
+    if (fetchError || !event) throw new Error("Event not found");
+    if (event.creator_id !== creatorId) throw new Error("Unauthorized");
+
+    const { error } = await supabase
+        .from("event_scan_grants")
+        .delete()
+        .eq("event_id", eventId)
+        .eq("user_id", granteeUserId);
+
+    if (error) throw error;
+    return { success: true };
+ }
+
+ export async function fetchScanGrants(eventId: string) {
+    const { data, error } = await supabase
+        .from("event_scan_grants")
+        .select("users(id, username, avatar)")
+        .eq("event_id", eventId);
+
+    if (error) throw error;
+    return (data ?? []).map((r: any) => r.users).filter(Boolean);
+ }
+
+ // Events this user can scan tickets for: ones they created, plus ones a
+ // creator explicitly granted them access to.
+ export async function fetchScannableEvents(userId: string) {
+    const [createdResult, grantedResult] = await Promise.all([
+        supabase
+            .from("events")
+            .select("id, title, event_date, venue, flyer_card, status")
+            .eq("creator_id", userId),
+        supabase
+            .from("event_scan_grants")
+            .select("events(id, title, event_date, venue, flyer_card, status)")
+            .eq("user_id", userId),
+    ]);
+
+    if (createdResult.error) throw createdResult.error;
+    if (grantedResult.error) throw grantedResult.error;
+
+    const granted = (grantedResult.data ?? []).map((r: any) => r.events).filter(Boolean);
+    const all = [...(createdResult.data ?? []), ...granted];
+
+    const seen = new Set<string>();
+    return all.filter((e) => {
+        if (seen.has(e.id)) return false;
+        seen.add(e.id);
+        return true;
+    });
+ }
+
 type TierBoundary = { id: string; name: string; upTo: number };
 
 // Cumulative supply boundaries in sort_order, e.g. tiers [VIP++:20, VIP:50,
@@ -197,7 +490,7 @@ async function mintOneCnft(eventId: string, tierBoundaries: TierBoundary[]) {
     const merkleTree = new PublicKey(globalState.currentTree);
 
     const [eventPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from("event"), Buffer.from(eventId)], PROGRAM_ID
+        [Buffer.from("event"), uuidSeed(eventId)], PROGRAM_ID
     );
     const eventAccount = await program.account.event.fetch(eventPda);
 
@@ -549,14 +842,25 @@ export async function burnExpiredTickets() {
     return { burned };
 }
 
-export async function getEventById(eventId: string) {
+export async function getEventById(eventId: string, inviteToken?: string) {
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, description, venue, event_date, flyer_card")
+    .select("id, title, description, venue, event_date, flyer_card, category, custom_category, video_url, invite_token, creator_id, ticket_supply, ticket_price, guest_list, status, cancellation_notice, ticket_tiers(id, name, price, supply, info, sort_order, group_ticket, free), collaborators:event_collaborators(users(id, username, avatar)), creator:users!events_creator_id_fkey(id, username, avatar)")
     .eq("id", eventId)
     .single();
   if (error) throw error;
-  return data;
+
+  if (data.category === "private" && data.invite_token !== inviteToken) {
+    throw new Error("Event not found");
+  }
+
+  return { ...data, collaborators: flattenCollaborators(data.collaborators) };
+}
+
+// Supabase's nested join shape is [{ users: {...} }] — flatten to a plain
+// {id, username, avatar}[] for the client.
+function flattenCollaborators(rows: any[] | null | undefined): { id: string; username: string; avatar: string | null }[] {
+  return (rows ?? []).map((r: any) => r.users).filter(Boolean);
 }
 
 export async function getEventStats(eventId: string, userId: string) {
@@ -572,7 +876,7 @@ export async function getEventStats(eventId: string, userId: string) {
   const [likesResult, mintedResult, soldRowsResult, tiersResult] = await Promise.all([
     supabase.from("event_likes").select("id", { count: "exact", head: true }).eq("event_id", eventId),
     supabase.from("collectibles").select("id", { count: "exact", head: true }).eq("event_id", eventId),
-    supabase.from("collectibles").select("tier_id").eq("event_id", eventId).neq("custodian", "treasury"),
+    supabase.from("collectibles").select("tier_id, sold_at").eq("event_id", eventId).neq("custodian", "treasury"),
     supabase.from("ticket_tiers").select("id, price").eq("event_id", eventId),
   ]);
 
@@ -582,22 +886,42 @@ export async function getEventStats(eventId: string, userId: string) {
   const priceByTier = new Map((tiersResult.data ?? []).map(t => [t.id, t.price]));
   const revenue = soldRows.reduce((sum, row) => sum + (priceByTier.get(row.tier_id) ?? 0), 0);
 
+  // Sales-by-window figures rely on `sold_at`, only populated for tickets sold
+  // after that column was added — older sales fall outside every window below
+  // rather than being misattributed to "now".
+  const now = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const salesLastDay = countSoldSince(soldRows, now - DAY_MS);
+  const salesLastWeek = countSoldSince(soldRows, now - 7 * DAY_MS);
+  const salesLastMonth = countSoldSince(soldRows, now - 30 * DAY_MS);
+  const salesLast3Months = countSoldSince(soldRows, now - 90 * DAY_MS);
+
   return {
     title: event.title,
     ticketSupply: event.ticket_supply,
     ticketPrice: event.ticket_price,
+    remaining: Math.max(event.ticket_supply - sold, 0),
     totalLikes: likesResult.count ?? 0,
     minted: mintedResult.count ?? 0,
     sold,
     revenue,
+    salesLastDay,
+    salesLastWeek,
+    salesLastMonth,
+    salesLast3Months,
   };
+}
+
+function countSoldSince(rows: { sold_at: string | null }[], cutoffMs: number): number {
+  return rows.filter(row => row.sold_at && new Date(row.sold_at).getTime() >= cutoffMs).length;
 }
 
 export async function fetchEvents(limit: number = 50, offset: number = 0) {
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, description, ticket_price, ticket_supply, event_date, venue, creator_id, flyer_card, status, ticket_tiers(id, name, price, supply, info, sort_order)")
-    .eq("status", "active")
+    .select("id, title, description, ticket_price, ticket_supply, event_date, venue, creator_id, flyer_card, status, category, custom_category, video_url, guest_list, cancellation_notice, ticket_tiers(id, name, price, supply, info, sort_order, group_ticket, free), collaborators:event_collaborators(users(id, username, avatar)), creator:users!events_creator_id_fkey(id, username, avatar)")
+    .in("status", ["active", "cancelled"])
+    .neq("category", "private")
     .order("event_date", { ascending: true })
     .range(offset, offset + limit - 1)
 
@@ -620,12 +944,29 @@ export async function fetchEvents(limit: number = 50, offset: number = 0) {
     }
   }
 
+  // Trending signal for the Home screen's "Trendy Events" section — likes in
+  // the last 7 days, per event.
+  const eventIds = data.map((e) => e.id);
+  const recentLikesCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recentLikes } = await supabase
+    .from("event_likes")
+    .select("event_id")
+    .in("event_id", eventIds)
+    .gte("created_at", recentLikesCutoff);
+
+  const recentLikesByEvent = new Map<string, number>();
+  for (const like of recentLikes ?? []) {
+    recentLikesByEvent.set(like.event_id, (recentLikesByEvent.get(like.event_id) ?? 0) + 1);
+  }
+
   return data.map((e) => ({
     ...e,
     ticket_tiers: (e.ticket_tiers ?? []).map((t: any) => ({
       ...t,
       remaining: remainingByTier.get(t.id) ?? 0,
     })),
+    collaborators: flattenCollaborators(e.collaborators),
+    recent_likes_count: recentLikesByEvent.get(e.id) ?? 0,
   }));
 }
 

@@ -39,9 +39,9 @@ function TicketCard({ item, navigation, isPinned }: CardProps) {
         >
             <View style={styles.flyerWrap}>
                 <View style={styles.flyerTilt}>
-                    {item.events?.flyer_card ? (
+                    {item.events?.flyer_card?.[0] ? (
                         <Image
-                            source={{ uri: item.events.flyer_card }}
+                            source={{ uri: item.events.flyer_card[0] }}
                             style={styles.flyerImage}
                             contentFit="cover"
                         />
@@ -54,7 +54,7 @@ function TicketCard({ item, navigation, isPinned }: CardProps) {
 
             <View style={styles.cardInner}>
                 {isPinned(item.id) && (
-                    <Ionicons name="pin" size={12} color={Colors.accent} style={styles.pinIcon} />
+                    <Ionicons name="pin" size={12} color={Colors.accentText} style={styles.pinIcon} />
                 )}
             </View>
             <View style={styles.cardOverlay}>
@@ -108,7 +108,7 @@ export default function CollectiblesScreen() {
         return (
             <View style={[styles.container, { backgroundColor: C.background }]}>
                 <CollectiblesHeader query={query} setQuery={setQuery} />
-                <ActivityIndicator style={{ flex: 1 }} color={Colors.accent} />
+                <ActivityIndicator style={{ flex: 1 }} color={C.accentText} />
             </View>
         );
     }
@@ -149,8 +149,8 @@ export default function CollectiblesScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor={Colors.accent}
-                        colors={[Colors.accent]}
+                        tintColor={C.accentText}
+                        colors={[C.accentText]}
                     />
                 }
                 ListHeaderComponent={
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     },
     cardPinned: {
         borderWidth: 2,
-        borderColor: Colors.accent,
+        borderColor: Colors.accentText,
     },
     flyerWrap: {
         ...StyleSheet.absoluteFillObject,

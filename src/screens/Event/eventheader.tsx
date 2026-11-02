@@ -63,7 +63,7 @@ export default function EventHeader({
                         </TouchableOpacity>
                     )}
                     <TouchableOpacity onPress={exitSearch} style={styles.cancelBtn}>
-                        <Text style={styles.cancelText}>Cancel</Text>
+                        <Text style={[styles.cancelText, { color: C.accentText }]}>Cancel</Text>
                     </TouchableOpacity>
                 </Animated.View>
             ) : (
@@ -150,7 +150,6 @@ const styles = StyleSheet.create({
     },
     cancelText: {
         fontSize: 14,
-        color: Colors.accent,
         fontWeight: "600",
     },
 });

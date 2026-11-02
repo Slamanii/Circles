@@ -1,4 +1,4 @@
-import { getUser, getUserProfile, searchUsers, fetchFollowers, fetchFollowing, followUser, unfollowUser, fetchEventLikes, fetchHostedEvents, fetchLikedEvents, updateProfile } from "../mod/users"
+import { getUser, getUserProfile, searchUsers, fetchFollowers, fetchFollowing, followUser, unfollowUser, fetchEventLikes, fetchHostedEvents, fetchLikedEvents, updateProfile, fetchTopCreators } from "../mod/users"
 import { Response } from 'express'
 import { AuthRequest } from "../mod/auth"
 
@@ -12,6 +12,21 @@ export async function searchUsersRouter(req: AuthRequest, res: Response) {
     } catch (error) {
         console.error(error)
         res.status(500).json({ error: "Search failed" })
+    }
+}
+
+export async function topCreatorsRouter(req: AuthRequest, res: Response) {
+    try {
+        const type = String(req.query.type || "");
+        if (type !== "artist" && type !== "host") {
+            return res.status(400).json({ error: "type must be 'artist' or 'host'" });
+        }
+        const limit = req.query.limit ? Number(req.query.limit) : undefined;
+        const results = await fetchTopCreators(type, limit);
+        res.json(results);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Failed to fetch top creators" });
     }
 }
 

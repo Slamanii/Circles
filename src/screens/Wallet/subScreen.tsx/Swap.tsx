@@ -22,6 +22,7 @@ import { makeCustodialSigner } from "../../../services/wallet/custodialSign";
 import { buildSwapTx, getSwapQuote } from "../../../services/wallet/swap/swapService";
 import { emitBalanceChanged } from "../../../services/wallet/walletEvents";
 import { Token } from "../../../../shared/Types";
+import { Colors } from "../../../shared/theme";
 
 export default function SwapScreen({ route }: any) {
     const { tokens, walletAddress, activeWallet } = route.params ?? {};
@@ -140,7 +141,7 @@ export default function SwapScreen({ route }: any) {
                 {/* Directional arrow — decorative only */}
                 <View style={styles.arrowWrap}>
                     <View style={styles.arrowCircle}>
-                        <Ionicons name="arrow-down" size={20} color="#fff" />
+                        <Ionicons name="arrow-down" size={20} color={Colors.black} />
                     </View>
                 </View>
 
@@ -240,13 +241,13 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 5,
         borderRadius: 20,
-        backgroundColor: "#E8622A22",
+        backgroundColor: Colors.accentText + "22",
     },
-    maxText:     { color: "#E8622A", fontWeight: "700", fontSize: 13 },
+    maxText:     { color: Colors.accentText, fontWeight: "700", fontSize: 13 },
     arrowWrap:   { alignItems: "center", marginVertical: 12 },
     arrowCircle: {
         width: 40, height: 40, borderRadius: 20,
-        backgroundColor: "#E8622A",
+        backgroundColor: Colors.accent,
         alignItems: "center", justifyContent: "center",
     },
     addBtn: {
@@ -257,11 +258,11 @@ const styles = StyleSheet.create({
     },
     quoteText:   { color: "#60A5FA", fontSize: 13, paddingHorizontal: 14, paddingBottom: 12 },
     confirmBtn: {
-        marginTop: 28, backgroundColor: "#E8622A",
+        marginTop: 28, backgroundColor: Colors.accent,
         borderRadius: 14, paddingVertical: 16, alignItems: "center",
     },
     disabled:    { opacity: 0.45 },
-    confirmText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+    confirmText: { color: Colors.black, fontWeight: "700", fontSize: 16 },
     walletNote:  { color: "#6B7280", fontSize: 12, textAlign: "center", marginTop: 16 },
     modalOverlay: { flex: 1, justifyContent: "flex-end" },
     modalSheet: {

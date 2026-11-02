@@ -6,6 +6,7 @@ import {
     Animated,
     FlatList,
     RefreshControl,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
@@ -21,6 +22,9 @@ import { Colors, getColors, Radius, TAB_PAD } from "../../shared/theme";
 import { useEventLogic } from "../Event/eventlogic";
 import HomeHeader from "./homeheader";
 import { useHomeLogic } from "./homelogic";
+import MovieCarousel from "./MovieCarousel";
+import TopCreatorsSection from "./TopCreatorsSection";
+import TrendingEventsSection from "./TrendingEventsSection";
 
 type Chip = { key: FilterSheetType | "all"; label: string };
 
@@ -41,7 +45,7 @@ export default function HomeScreen() {
     const [showLocationPicker, setShowLocationPicker] = useState(false);
 
     const { events, loading, error, reload, likedIds, savedIds, handleLike } = useEventLogic();
-    const { location, updateLocation, handlePreSave, handleGetTicket, onChatPress } = useHomeLogic();
+    const { location, displayName, avatar, updateLocation, handlePreSave, handleGetTicket, onChatPress } = useHomeLogic();
 
     const {
         filtered,
@@ -107,9 +111,13 @@ export default function HomeScreen() {
         setOpenSheet(key as FilterSheetType);
     };
 
+    // The curated sections (movies/top creators/trending) are the default
+    // landing view; searching or applying a filter switches to flat results.
+    const showFlatList = searchActive || hasDateFilter || hasPriceFilter || hasLocationFilter;
+
     if (loading) return (
         <View style={[styles.center, { backgroundColor: C.background }]}>
-            <ActivityIndicator color={Colors.accent} />
+            <ActivityIndicator color={C.accentText} />
         </View>
     );
 
@@ -123,8 +131,8 @@ export default function HomeScreen() {
                 <RefreshControl
                     refreshing={refreshing}
                     onRefresh={onRefresh}
-                    tintColor={Colors.accent}
-                    colors={[Colors.accent]}
+                    tintColor={C.accentText}
+                    colors={[C.accentText]}
                 />
             }
             ListEmptyComponent={
@@ -137,9 +145,12 @@ export default function HomeScreen() {
         <View style={[styles.container, { backgroundColor: C.background }]}>
             <HomeHeader
                 address={location}
+                displayName={displayName}
+                avatar={avatar}
                 onChatPress={onChatPress}
                 onNotificationsPress={() => navigation.navigate("Notifications")}
                 onLocationPress={() => setShowLocationPicker(true)}
+                onAvatarPress={() => navigation.navigate("Profile")}
             />
 
             {/* Nav row */}
@@ -163,7 +174,7 @@ export default function HomeScreen() {
                             </TouchableOpacity>
                         )}
                         <TouchableOpacity onPress={exitSearch} style={styles.cancelBtn}>
-                            <Text style={styles.cancelText}>Cancel</Text>
+                            <Text style={[styles.cancelText, { color: C.accentText }]}>Cancel</Text>
                         </TouchableOpacity>
                     </Animated.View>
                 ) : (
@@ -203,7 +214,7 @@ export default function HomeScreen() {
                                         <Ionicons
                                             name={active ? "options" : "chevron-down"}
                                             size={12}
-                                            color={active ? Colors.white : C.textSecondary}
+                                            color={active ? Colors.black : C.textSecondary}
                                             style={{ marginLeft: 3 }}
                                         />
                                     )}
@@ -218,40 +229,77 @@ export default function HomeScreen() {
                 )}
             </View>
 
-            <FlatList
-                data={displayed}
-                keyExtractor={item => item.id}
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={styles.list}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={onRefresh}
-                        tintColor={Colors.accent}
-                        colors={[Colors.accent]}
+            {showFlatList ? (
+                <FlatList
+                    data={displayed}
+                    keyExtractor={item => item.id}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.list}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={C.accentText}
+                            colors={[C.accentText]}
+                        />
+                    }
+                    renderItem={({ item }) => (
+                        <EventCard
+                            event={item}
+                            liked={likedIds.has(item.id)}
+                            saved={savedIds.has(item.id)}
+                            onLike={() => handleLike(item.id)}
+                            onPreSave={() => handlePreSave(item.id)}
+                            onGetTicket={() => handleGetTicket(item.id)}
+                        />
+                    )}
+                    ListEmptyComponent={
+                        <View style={styles.empty}>
+                            <Ionicons name="calendar-outline" size={40} color={C.textMuted} />
+                            <Text style={[styles.emptyText, { color: C.textMuted }]}>
+                                {debouncedQuery.trim()
+                                    ? `No events for "${debouncedQuery}"`
+                                    : "No events match your filters"}
+                            </Text>
+                        </View>
+                    }
+                />
+            ) : (
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.list}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={C.accentText}
+                            colors={[C.accentText]}
+                        />
+                    }
+                >
+                    <MovieCarousel events={events} onPressEvent={handleGetTicket} />
+                    <TopCreatorsSection
+                        title="Top Artists"
+                        accountType="artist"
+                        onSeeAll={() => navigation.navigate("Artists")}
+                        onPressUser={(userId) => navigation.navigate("UserProfile", { followingId: userId })}
                     />
-                }
-                renderItem={({ item }) => (
-                    <EventCard
-                        event={item}
-                        liked={likedIds.has(item.id)}
-                        saved={savedIds.has(item.id)}
-                        onLike={() => handleLike(item.id)}
-                        onPreSave={() => handlePreSave(item.id)}
-                        onGetTicket={() => handleGetTicket(item.id)}
+                    <TopCreatorsSection
+                        title="Top Promoters"
+                        accountType="host"
+                        onSeeAll={() => navigation.navigate("Promoters")}
+                        onPressUser={(userId) => navigation.navigate("UserProfile", { followingId: userId })}
                     />
-                )}
-                ListEmptyComponent={
-                    <View style={styles.empty}>
-                        <Ionicons name="calendar-outline" size={40} color={C.textMuted} />
-                        <Text style={[styles.emptyText, { color: C.textMuted }]}>
-                            {debouncedQuery.trim()
-                                ? `No events for "${debouncedQuery}"`
-                                : "No events match your filters"}
-                        </Text>
-                    </View>
-                }
-            />
+                    <TrendingEventsSection
+                        events={events}
+                        likedIds={likedIds}
+                        savedIds={savedIds}
+                        onLike={handleLike}
+                        onPreSave={handlePreSave}
+                        onGetTicket={handleGetTicket}
+                    />
+                </ScrollView>
+            )}
 
             <FilterSheet
                 visible={openSheet !== null}
@@ -313,7 +361,7 @@ const styles = StyleSheet.create({
         borderColor: Colors.accent,
     },
     chipText:       { fontSize: 13, fontWeight: "500" },
-    chipTextActive: { color: Colors.white, fontWeight: "600" },
+    chipTextActive: { color: Colors.black, fontWeight: "600" },
     activeDot: {
         width: 5,
         height: 5,
@@ -333,7 +381,7 @@ const styles = StyleSheet.create({
     },
     searchInput: { flex: 1, fontSize: 15, padding: 0 },
     cancelBtn:   { paddingLeft: 4 },
-    cancelText:  { fontSize: 14, color: Colors.accent, fontWeight: "600" },
+    cancelText:  { fontSize: 14, fontWeight: "600" },
     list:        { paddingBottom: TAB_PAD },
     empty:       { alignItems: "center", paddingTop: 60, gap: 10 },
     emptyText:   { fontSize: 15 },

@@ -12,37 +12,47 @@ export const Colors = {
     text: "#0A0A0A",
     textSecondary: "#6B7280",
     textMuted: "#9CA3AF",
-    accent: "#E8622A",
-    accentLight: "#FEF2EE",
+    // Fill color (button/chip/badge backgrounds) — always pair with a dark
+    // foreground on top, in both themes, since this is a light color.
+    accent: "#D7F23A",
+    // Foreground color (icon/text/border/link on top of a background, not a
+    // fill) — theme-aware because raw lemon reads poorly as text on a light
+    // background; see getColors() for the light-mode override.
+    accentText: "#D7F23A",
+    accentLight: "#F3FBD9",
     black: "#000000",
     white: "#FFFFFF",
+    purple: "#2D1B45",
+    pink: "#E85AA0",
 
     // dark surfaces (wallet, story viewer)
-    darkBg: "#2E2D2D",
-    darkSurface: "#424040",
-    darkCard: "#1C1C1C",
-    darkBorder: "#2D2D2D",
+    darkBg: "#1B1326",
+    darkSurface: "#271A38",
+    darkCard: "#271A38",
+    darkBorder: "#3A2B4D",
     darkText: "#FFFFFF",
     darkTextSecondary: "#9CA3AF",
 
-    storyBorder: "#E8622A",
+    storyBorder: "#D7F23A",
 };
 
 export type ThemeColors = typeof Colors;
 
 export function getColors(theme: "light" | "dark") {
-    if (theme === "light") return Colors;
+    if (theme === "light") {
+        return { ...Colors, accentText: "#7A9A1E" };
+    }
     return {
         ...Colors,
-        background: "#2E2D2D",
-        surface: "#3A3939",
-        card: "#3A3939",
-        headerBg: "#2E2D2D",
-        border: "#555555",
+        background: "#1B1326",
+        surface: "#271A38",
+        card: "#271A38",
+        headerBg: "#1B1326",
+        border: "#3A2B4D",
         text: "#FFFFFF",
         textSecondary: "#AAAAAA",
         textMuted: "#777777",
-        accentLight: "#3D2A24",
+        accentLight: "#2E3A14",
     } as typeof Colors;
 }
 

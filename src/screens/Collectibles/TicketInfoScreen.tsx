@@ -93,6 +93,26 @@ export default function TicketInfoScreen({ route }: any) {
                 <Text style={{ color: "#60A5FA", fontSize: 32 }}>🎟</Text>
             </View>
 
+            {ticket.events?.status === "cancelled" && (
+                <View style={{
+                    backgroundColor: "#D6454520",
+                    borderLeftWidth: 3,
+                    borderLeftColor: "#D64545",
+                    borderRadius: 10,
+                    padding: 12,
+                    marginBottom: 16,
+                }}>
+                    <Text style={{ color: "#D64545", fontWeight: "700", fontSize: 14, marginBottom: 4 }}>
+                        This event was cancelled
+                    </Text>
+                    {!!ticket.events.cancellation_notice && (
+                        <Text style={{ color: "#D64545", fontSize: 13, lineHeight: 18 }}>
+                            {ticket.events.cancellation_notice}
+                        </Text>
+                    )}
+                </View>
+            )}
+
             <TicketControlCard
                 ticketId={ticket.id}
                 send={() => navigation.navigate("SendTicket", { ticket })}

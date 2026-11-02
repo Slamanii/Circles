@@ -15,8 +15,22 @@ import {
     View,
 } from "react-native";
 import { useAppTheme } from "../../context/ThemeContext";
-import { getColors } from "../../shared/theme";
-import { createEvent, uploadFlyer } from "../../services/eventService";
+import { Colors, getColors } from "../../shared/theme";
+import { createEvent, uploadEventVideo, uploadFlyer } from "../../services/eventService";
+
+const MAX_VIDEO_SECONDS = 30;
+const MAX_MOVIE_FLYERS = 5;
+
+const CATEGORIES = [
+    { key: "movie",        label: "Movie" },
+    { key: "professional", label: "Professional" },
+    { key: "concert",      label: "Concert" },
+    { key: "birthday",     label: "Birthday" },
+    { key: "sports",       label: "Sports" },
+    { key: "educational",  label: "Educational" },
+    { key: "private",      label: "Private" },
+    { key: "other",        label: "Other" },
+] as const;
 
 function dividerColor(theme: string) {
     return theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.12)";
@@ -73,7 +87,15 @@ export default function CreateEventScreen() {
     const [showPicker, setShowPicker] = useState(false);
     const [pickerMode, setPickerMode] = useState<"date" | "time">("date");
     const [loading, setLoading] = useState(false);
-    const [flyerUri, setFlyerUri] = useState<string | null>(null);
+
+    // A non-movie event may only carry one flyer image; a movie event may carry several.
+    const [flyerUris, setFlyerUris] = useState<string[]>([]);
+
+    const [category, setCategory] = useState<typeof CATEGORIES[number]["key"]>("other");
+    const [customCategory, setCustomCategory] = useState("");
+
+    // Movie-only — a single short clip, capped at MAX_VIDEO_SECONDS.
+    const [videoUri, setVideoUri] = useState<string | null>(null);
 
     // Base tier — always present, always required
     const [baseSupply, setBaseSupply] = useState("");
@@ -92,37 +114,95 @@ export default function CreateEventScreen() {
     const [vipPlusPrice, setVipPlusPrice] = useState("");
     const [vipPlusInfo, setVipPlusInfo] = useState("");
 
+    // Group ticket — one ticket, N admissions
+    const [groupOpen, setGroupOpen] = useState(false);
+    const [groupSupply, setGroupSupply] = useState("");
+    const [groupPrice, setGroupPrice] = useState("");
+    const [groupSize, setGroupSize] = useState("");
+    const [groupInfo, setGroupInfo] = useState("");
+
+    // Free ticket — no price, skips the payment terminal entirely
+    const [freeOpen, setFreeOpen] = useState(false);
+    const [freeSupply, setFreeSupply] = useState("");
+    const [freeInfo, setFreeInfo] = useState("");
+
+    const GUEST_SLOTS = 15;
+    const [guestNames, setGuestNames] = useState<string[]>(Array(GUEST_SLOTS).fill(""));
+    const setGuestName = (index: number, value: string) => {
+        setGuestNames(prev => prev.map((n, i) => i === index ? value : n));
+    };
+
     const pickFlyer = async () => {
         const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ["images"],
-            allowsEditing: true,
+            allowsEditing: category !== "movie",
             aspect: [2, 3],
             quality: 0.85,
         });
-        if (!result.canceled && result.assets[0]) setFlyerUri(result.assets[0].uri);
+        if (result.canceled || !result.assets[0]) return;
+
+        const uri = result.assets[0].uri;
+        if (category === "movie") {
+            setFlyerUris(prev => prev.length >= MAX_MOVIE_FLYERS ? prev : [...prev, uri]);
+        } else {
+            setFlyerUris([uri]);
+        }
+    };
+
+    const removeFlyer = (index: number) => {
+        setFlyerUris(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const pickVideo = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ["videos"],
+            quality: 0.85,
+        });
+        if (result.canceled || !result.assets[0]) return;
+
+        const asset = result.assets[0];
+        if (asset.duration != null && asset.duration > MAX_VIDEO_SECONDS * 1000) {
+            Alert.alert("Video too long", `Movie clips can be at most ${MAX_VIDEO_SECONDS} seconds.`);
+            return;
+        }
+        setVideoUri(asset.uri);
     };
 
     const isValid = title.trim() && venue.trim() && basePrice.trim() && baseSupply.trim() && eventDate
         && (!vipOpen || (vipPrice.trim() && vipSupply.trim()))
-        && (!vipPlusOpen || (vipPlusPrice.trim() && vipPlusSupply.trim()));
+        && (!vipPlusOpen || (vipPlusPrice.trim() && vipPlusSupply.trim()))
+        && (!groupOpen || (groupPrice.trim() && groupSupply.trim() && groupSize.trim()))
+        && (!freeOpen || freeSupply.trim())
+        && (category !== "other" || customCategory.trim().length <= 15);
 
     const handleSubmit = async () => {
         if (!isValid || !eventDate) return;
 
-        const tiers = [{ name: "Base", price: parseInt(basePrice, 10), supply: parseInt(baseSupply, 10), info: baseInfo.trim() || undefined }];
+        const tiers: any[] = [
+            { name: "Base", price: parseInt(basePrice, 10), supply: parseInt(baseSupply, 10), info: baseInfo.trim() || undefined },
+        ];
         if (vipOpen) tiers.push({ name: "VIP", price: parseInt(vipPrice, 10), supply: parseInt(vipSupply, 10), info: vipInfo.trim() || undefined });
         if (vipPlusOpen) tiers.push({ name: "VIP++", price: parseInt(vipPlusPrice, 10), supply: parseInt(vipPlusSupply, 10), info: vipPlusInfo.trim() || undefined });
+        if (groupOpen) tiers.push({
+            name: "Group", price: parseInt(groupPrice, 10), supply: parseInt(groupSupply, 10),
+            groupTicket: parseInt(groupSize, 10), info: groupInfo.trim() || undefined,
+        });
+        if (freeOpen) tiers.push({ name: "Free", price: 0, free: true, supply: parseInt(freeSupply, 10), info: freeInfo.trim() || undefined });
 
         for (const tier of tiers) {
-            if (isNaN(tier.price) || tier.price <= 0) { Alert.alert(`Invalid price for ${tier.name}`); return; }
+            if (!tier.free && (isNaN(tier.price) || tier.price <= 0)) { Alert.alert(`Invalid price for ${tier.name}`); return; }
             if (isNaN(tier.supply) || tier.supply < 1) { Alert.alert(`Invalid ticket count for ${tier.name}`); return; }
+            if (tier.groupTicket != null && (isNaN(tier.groupTicket) || tier.groupTicket < 2)) {
+                Alert.alert("Group size must be 2 or more"); return;
+            }
         }
         if (eventDate <= new Date()) { Alert.alert("Event date must be in the future"); return; }
 
         setLoading(true);
         try {
-            let flyerCard: string | undefined;
-            if (flyerUri) flyerCard = await uploadFlyer(flyerUri);
+            const flyerCards = await Promise.all(flyerUris.map(uri => uploadFlyer(uri)));
+            const videoUrl = category === "movie" && videoUri ? await uploadEventVideo(videoUri) : undefined;
+            const guestList = guestNames.map(n => n.trim()).filter(Boolean).join("\n") || undefined;
 
             await createEvent({
                 title: title.trim(),
@@ -130,7 +210,11 @@ export default function CreateEventScreen() {
                 venue: venue.trim(),
                 tiers,
                 eventDate: eventDate.toISOString(),
-                flyerCard,
+                flyerCards,
+                category,
+                customCategory: category === "other" ? (customCategory.trim() || undefined) : undefined,
+                videoUrl,
+                guestList,
             });
             Alert.alert("Event created!", "Your tickets are being minted.", [
                 { text: "OK", onPress: () => navigation.goBack() },
@@ -154,14 +238,63 @@ export default function CreateEventScreen() {
 
             <Text style={[styles.heading, { color: C.text }]}>Add Event</Text>
 
-            {/* Flyer picker — 2:3 portrait */}
-            <TouchableOpacity style={[styles.flyerPicker, { backgroundColor: C.surface }]} onPress={pickFlyer}>
-                {flyerUri ? (
-                    <Image source={{ uri: flyerUri }} style={styles.flyerPreview} />
-                ) : (
-                    <Text style={[styles.flyerPrompt, { color: C.textSecondary }]}>+ Add Flyer</Text>
+            {/* Category */}
+            <Text style={[styles.sectionLabel, { color: C.textSecondary }]}>Category</Text>
+            <View style={styles.categoryRow}>
+                {CATEGORIES.map(c => (
+                    <TouchableOpacity
+                        key={c.key}
+                        style={[
+                            styles.categoryChip,
+                            { backgroundColor: C.card, borderColor: category === c.key ? C.accentText : "transparent" },
+                        ]}
+                        onPress={() => {
+                            setCategory(c.key);
+                            if (c.key !== "movie") { setFlyerUris(prev => prev.slice(0, 1)); setVideoUri(null); }
+                        }}
+                    >
+                        <Text style={[styles.categoryChipText, { color: category === c.key ? C.accentText : C.text }]}>
+                            {c.label}
+                        </Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+            {category === "other" && (
+                <View style={[styles.card, { backgroundColor: C.card, marginTop: 8 }]}>
+                    <FieldRow
+                        placeholder="Custom category (one word, 15 chars max)"
+                        value={customCategory}
+                        onChangeText={(t: string) => setCustomCategory(t.replace(/\s/g, "").slice(0, 15))}
+                        theme={theme} C={C} isLast
+                    />
+                </View>
+            )}
+
+            {/* Flyer picker(s) — one image, or several for a movie event */}
+            <View style={styles.flyerRow}>
+                {flyerUris.map((uri, i) => (
+                    <View key={uri} style={[styles.flyerThumb, { backgroundColor: C.surface }]}>
+                        <Image source={{ uri }} style={styles.flyerPreview} />
+                        <TouchableOpacity style={styles.flyerRemove} onPress={() => removeFlyer(i)}>
+                            <Text style={styles.flyerRemoveText}>×</Text>
+                        </TouchableOpacity>
+                    </View>
+                ))}
+                {(category === "movie" ? flyerUris.length < MAX_MOVIE_FLYERS : flyerUris.length === 0) && (
+                    <TouchableOpacity style={[styles.flyerThumb, styles.flyerAdd, { backgroundColor: C.surface }]} onPress={pickFlyer}>
+                        <Text style={[styles.flyerPrompt, { color: C.textSecondary }]}>+ Add Flyer</Text>
+                    </TouchableOpacity>
                 )}
-            </TouchableOpacity>
+            </View>
+
+            {/* Movie video — optional, one clip, 30s max */}
+            {category === "movie" && (
+                <TouchableOpacity style={[styles.card, styles.accordionHeader, { backgroundColor: C.card }]} onPress={pickVideo}>
+                    <Text style={[styles.accordionText, { color: C.text }]}>
+                        {videoUri ? "Video attached — tap to replace" : `+ Add Clip (max ${MAX_VIDEO_SECONDS}s)`}
+                    </Text>
+                </TouchableOpacity>
+            )}
 
             {/* Card 1 */}
             <View style={[styles.card, { backgroundColor: C.card }]}>
@@ -177,7 +310,7 @@ export default function CreateEventScreen() {
                 <FieldRow placeholder="Messages" value={message} onChangeText={setMessage} theme={theme} C={C} isLast />
             </View>
 
-            {/* Ticket tiers: Base always shown, VIP / VIP++ are optional accordions */}
+            {/* Ticket tiers: Base always shown, the rest are optional accordions */}
             <Text style={[styles.sectionLabel, { color: C.textSecondary }]}>Base Tier</Text>
             <View style={[styles.card, { backgroundColor: C.card }]}>
                 <FieldRow placeholder="No of Tickets" value={baseSupply} onChangeText={setBaseSupply} keyboardType="number-pad" theme={theme} C={C} />
@@ -212,6 +345,48 @@ export default function CreateEventScreen() {
                     <FieldRow placeholder="Tier Info (seating, perks, etc.)" value={vipPlusInfo} onChangeText={setVipPlusInfo} theme={theme} C={C} isLast />
                 </View>
             )}
+
+            <TouchableOpacity
+                style={[styles.card, styles.accordionHeader, { backgroundColor: C.card }]}
+                onPress={() => setGroupOpen(o => !o)}
+            >
+                <Text style={[styles.accordionText, { color: C.text }]}>{groupOpen ? "− Remove Group" : "+ Add Group Ticket"}</Text>
+            </TouchableOpacity>
+            {groupOpen && (
+                <View style={[styles.card, { backgroundColor: C.card }]}>
+                    <FieldRow placeholder="No of Tickets" value={groupSupply} onChangeText={setGroupSupply} keyboardType="number-pad" theme={theme} C={C} />
+                    <FieldRow placeholder="Ticket Amount" value={groupPrice}  onChangeText={setGroupPrice}  keyboardType="number-pad" theme={theme} C={C} />
+                    <FieldRow placeholder="People per ticket (2+)" value={groupSize} onChangeText={setGroupSize} keyboardType="number-pad" theme={theme} C={C} />
+                    <FieldRow placeholder="Tier Info (seating, perks, etc.)" value={groupInfo} onChangeText={setGroupInfo} theme={theme} C={C} isLast />
+                </View>
+            )}
+
+            <TouchableOpacity
+                style={[styles.card, styles.accordionHeader, { backgroundColor: C.card }]}
+                onPress={() => setFreeOpen(o => !o)}
+            >
+                <Text style={[styles.accordionText, { color: C.text }]}>{freeOpen ? "− Remove Free" : "+ Add Free Ticket"}</Text>
+            </TouchableOpacity>
+            {freeOpen && (
+                <View style={[styles.card, { backgroundColor: C.card }]}>
+                    <FieldRow placeholder="No of Tickets" value={freeSupply} onChangeText={setFreeSupply} keyboardType="number-pad" theme={theme} C={C} />
+                    <FieldRow placeholder="Tier Info (seating, perks, etc.)" value={freeInfo} onChangeText={setFreeInfo} theme={theme} C={C} isLast />
+                </View>
+            )}
+
+            <Text style={[styles.sectionLabel, { color: C.textSecondary }]}>Guest List (up to 15, optional)</Text>
+            <View style={[styles.card, { backgroundColor: C.card }]}>
+                {guestNames.map((name, i) => (
+                    <FieldRow
+                        key={i}
+                        placeholder={`Guest ${i + 1}`}
+                        value={name}
+                        onChangeText={(t: string) => setGuestName(i, t)}
+                        theme={theme} C={C}
+                        isLast={i === guestNames.length - 1}
+                    />
+                ))}
+            </View>
 
             {showPicker && (
                 <DateTimePicker
@@ -250,7 +425,7 @@ export default function CreateEventScreen() {
                 disabled={!isValid || loading}
             >
                 {loading
-                    ? <ActivityIndicator color="white" />
+                    ? <ActivityIndicator color={Colors.black} />
                     : <Text style={styles.submitText}>Create Event</Text>
                 }
             </TouchableOpacity>
@@ -280,25 +455,56 @@ const styles = StyleSheet.create({
     },
     submitBtn: {
         marginTop: 8,
-        backgroundColor: "#E8622A",
+        backgroundColor: Colors.accent,
         padding: 16,
         borderRadius: 14,
         alignItems: "center",
     },
     submitBtnDisabled: { backgroundColor: "#ccc" },
-    submitText: { color: "white", fontWeight: "700", fontSize: 15 },
-    flyerPicker: {
-        alignSelf: "center",
-        width: 160,
-        height: 240,
-        borderRadius: 14,
+    submitText: { color: Colors.black, fontWeight: "700", fontSize: 15 },
+    flyerRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 10,
+        justifyContent: "center",
         marginBottom: 24,
+    },
+    flyerThumb: {
+        width: 120,
+        height: 180,
+        borderRadius: 14,
         overflow: "hidden",
         alignItems: "center",
         justifyContent: "center",
     },
+    flyerAdd: {},
     flyerPreview: { width: "100%", height: "100%" },
-    flyerPrompt: { fontSize: 14, fontWeight: "600" },
+    flyerPrompt: { fontSize: 13, fontWeight: "600" },
+    flyerRemove: {
+        position: "absolute",
+        top: 6,
+        right: 6,
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: "rgba(0,0,0,0.6)",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    flyerRemoveText: { color: "#fff", fontSize: 14, fontWeight: "700", lineHeight: 16 },
+    categoryRow: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 8,
+        marginBottom: 4,
+    },
+    categoryChip: {
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+        borderRadius: 20,
+        borderWidth: 1.5,
+    },
+    categoryChipText: { fontSize: 13, fontWeight: "600" },
     sectionLabel: {
         fontSize: 12,
         fontWeight: "700",

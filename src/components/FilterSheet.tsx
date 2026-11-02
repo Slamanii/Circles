@@ -192,13 +192,13 @@ function DateRow({ label, value, C, onPress, active }: {
 }) {
     return (
         <TouchableOpacity
-            style={[styles.dateRow, { backgroundColor: C.surface, borderColor: active ? Colors.accent : C.border }]}
+            style={[styles.dateRow, { backgroundColor: C.surface, borderColor: active ? C.accentText : C.border }]}
             onPress={onPress}
             activeOpacity={0.75}
         >
             <Text style={[styles.dateLabel, { color: C.textSecondary }]}>{label}</Text>
-            <Text style={[styles.dateValue, { color: active ? Colors.accent : C.text }]}>{value}</Text>
-            <Ionicons name="calendar-outline" size={18} color={active ? Colors.accent : C.textSecondary} />
+            <Text style={[styles.dateValue, { color: active ? C.accentText : C.text }]}>{value}</Text>
+            <Ionicons name="calendar-outline" size={18} color={active ? C.accentText : C.textSecondary} />
         </TouchableOpacity>
     );
 }
@@ -300,10 +300,10 @@ function LocationContent({ C, locations, selectedLocation, onSelect }: {
                         onPress={() => onSelect(active ? null : item)}
                         activeOpacity={0.7}
                     >
-                        <Text style={[styles.locationText, { color: active ? Colors.accent : C.text }]}>
+                        <Text style={[styles.locationText, { color: active ? C.accentText : C.text }]}>
                             {item}
                         </Text>
-                        {active && <Ionicons name="checkmark" size={18} color={Colors.accent} />}
+                        {active && <Ionicons name="checkmark" size={18} color={C.accentText} />}
                     </TouchableOpacity>
                 );
             }}
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
         alignItems: "center",
     },
     applyText: {
-        color: "#fff",
+        color: Colors.black,
         fontWeight: "700",
         fontSize: 15,
     },

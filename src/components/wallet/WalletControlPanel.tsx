@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { WalletControlPanelType } from "../../../shared/Types";
+import { Colors } from "../../shared/theme";
 
 type ActionBtnProps = {
     icon: React.ComponentProps<typeof Ionicons>["name"];
@@ -11,7 +12,7 @@ type ActionBtnProps = {
 function ActionBtn({ icon, label, onPress }: ActionBtnProps) {
     return (
         <TouchableOpacity style={styles.actionBtn} onPress={onPress} activeOpacity={0.75}>
-            <Ionicons name={icon} size={30} color="#E8622A" />
+            <Ionicons name={icon} size={30} color={Colors.accentText} />
             <Text style={styles.actionLabel}>{label}</Text>
         </TouchableOpacity>
     );

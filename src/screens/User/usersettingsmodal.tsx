@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert, Modal, StyleSheet, Switch, Text, TouchableOpacity, View } from "react-native";
 import { deleteAccount } from "../../services/login";
 import { useAppTheme } from "../../context/ThemeContext";
-import { getColors } from "../../shared/theme";
+import { Colors, getColors } from "../../shared/theme";
 
 function dividerColor(theme: string) {
     return theme === "dark" ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.12)";
@@ -82,7 +82,7 @@ export function SettingsModal({
                                 <Switch
                                     value={theme === "dark"}
                                     onValueChange={toggleTheme}
-                                    trackColor={{ true: "#E8622A" }}
+                                    trackColor={{ true: Colors.accent }}
                                 />
                             }
                         />

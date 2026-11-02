@@ -6,6 +6,7 @@ import { NextFunction, Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import nacl from "tweetnacl";
 import { generateSolanaWallet } from "../services/solana";
+import { sendPasswordResetEmail } from "../services/email";
 import { supabase } from "../services/supabase";
 
 const SALT_ROUNDS = 12;
@@ -91,7 +92,10 @@ export function requireStepUp(purpose: StepUpPurpose) {
 
 // ── Email + password auth ────────────────────────────────────────────────────
 
-export async function loginOrSignup(email: string, password: string) {
+export const ACCOUNT_TYPES = ["user", "artist", "host", "vendor", "venue"] as const;
+export type AccountType = typeof ACCOUNT_TYPES[number];
+
+export async function loginOrSignup(email: string, password: string, accountType?: string) {
     let { data: user } = await supabase
         .from("users")
         .select("*")
@@ -99,6 +103,10 @@ export async function loginOrSignup(email: string, password: string) {
         .single();
 
     if (!user) {
+        if (accountType && !ACCOUNT_TYPES.includes(accountType as AccountType)) {
+            throw new Error("Invalid account type");
+        }
+
         const password_hash = await bcrypt.hash(password, SALT_ROUNDS);
         const wallet = generateSolanaWallet();
         // encrypted_private_key repurposed: now stores the AES-encrypted BIP39 mnemonic
@@ -113,6 +121,7 @@ export async function loginOrSignup(email: string, password: string) {
                 display_name: email.split("@")[0],
                 address: wallet.publicKey,
                 encrypted_private_key,
+                account_type: accountType ?? "user",
             })
             .select()
             .single();
@@ -133,6 +142,26 @@ export async function loginOrSignup(email: string, password: string) {
 
     const token = signToken(user.id, user.email);
     return { user, token };
+}
+
+export async function requestPasswordReset(email: string) {
+    const { data: user } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .maybeSingle();
+
+    // Always resolve without error, whether or not the account exists —
+    // don't let this endpoint reveal which emails are registered.
+    if (!user) return;
+
+    const code = crypto.randomInt(100000, 1000000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+    await supabase.from("password_resets").delete().eq("email", email);
+    await supabase.from("password_resets").insert({ email, token: code, expires_at: expiresAt });
+
+    await sendPasswordResetEmail(email, code);
 }
 
 export async function resetPassword(email: string, newPassword: string, resetToken: string) {

@@ -1,7 +1,5 @@
 import { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Text, View } from "react-native";
-import { useAppTheme } from "../../context/ThemeContext";
-import { getColors } from "../../shared/theme";
 
 function Dot({ delay, color }: { delay: number; color: string }) {
     const bounce = useRef(new Animated.Value(0)).current;
@@ -30,16 +28,14 @@ function Dot({ delay, color }: { delay: number; color: string }) {
 }
 
 export function TypingBubble({ label }: { label: string }) {
-    const C = getColors(useAppTheme().theme);
-
     return (
         <View style={styles.row}>
-            <View style={[styles.bubble, { backgroundColor: C.surface }]}>
-                <Dot delay={0} color={C.textSecondary} />
-                <Dot delay={150} color={C.textSecondary} />
-                <Dot delay={300} color={C.textSecondary} />
+            <View style={[styles.bubble, { backgroundColor: "rgba(0,0,0,0.35)" }]}>
+                <Dot delay={0} color="rgba(255,255,255,0.7)" />
+                <Dot delay={150} color="rgba(255,255,255,0.7)" />
+                <Dot delay={300} color="rgba(255,255,255,0.7)" />
             </View>
-            <Text style={[styles.label, { color: C.textMuted }]} numberOfLines={1}>{label}</Text>
+            <Text style={[styles.label, { color: "rgba(255,255,255,0.6)" }]} numberOfLines={1}>{label}</Text>
         </View>
     );
 }
