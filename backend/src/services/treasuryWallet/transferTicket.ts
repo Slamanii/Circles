@@ -1,11 +1,9 @@
 import { mplBubblegum, transferV2 } from "@metaplex-foundation/mpl-bubblegum"
 import { keypairIdentity, publicKey } from "@metaplex-foundation/umi"
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults"
-import fs from "fs"
+import { loadTreasurySecret } from "./loadSecret"
 
-const secret = JSON.parse(
-    fs.readFileSync("./treasury-keypair.json", "utf8")
-)
+const secret = loadTreasurySecret()
 
 const umi = createUmi(process.env.HELIUS_RPC_URL!)
                 .use(mplBubblegum())

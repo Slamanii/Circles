@@ -5,12 +5,12 @@ import {
   PublicKey
 } from "@solana/web3.js";
 import BN from "bn.js";
-import fs from "fs";
 import { burn, mplBubblegum } from "@metaplex-foundation/mpl-bubblegum";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import { keypairIdentity, publicKey as umiPublicKey } from "@metaplex-foundation/umi";
 import IDL from "../../../target/idl/ticket_program.json";
 import { TicketProgram } from "../../../target/types/ticket_program";
+import { loadTreasurySecret } from "../services/treasuryWallet/loadSecret";
 import bs58 from "bs58";
 import crypto from "crypto";
 import { supabase } from "../services/supabase";
@@ -32,9 +32,7 @@ const BUBBLEGUM_PROGRAM_ID = new PublicKey("BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK7
 const SPL_COMPRESSION_ID = new PublicKey("cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK");
 const SPL_NOOP_ID = new PublicKey("noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV");
 
-const secret = JSON.parse(
-    fs.readFileSync("./treasury-keypair.json", "utf8")
-)
+const secret = loadTreasurySecret();
 export const treasuryWeb3Keypair = Keypair.fromSecretKey(
     new Uint8Array(secret)
 );
